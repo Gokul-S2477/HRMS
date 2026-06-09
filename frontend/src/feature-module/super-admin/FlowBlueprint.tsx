@@ -30,8 +30,8 @@ const STAGES: StepDetail[] = [
       "Candidate Status Kanban Board",
       "Referrals & Interview Schedulers"
     ],
-    models: ["Job", "Candidate", "Interview", "Referral"],
-    endpoints: ["/jobs/", "/candidates/", "/recruitment/interviews/", "/referrals/"],
+    models: ["RecruitmentJob", "RecruitmentCandidate", "RecruitmentInterview", "RecruitmentReferral"],
+    endpoints: ["/api/recruitment/jobs/", "/api/recruitment/candidates/", "/api/recruitment/interviews/", "/api/recruitment/referrals/"],
     interdependencies: [
       { target: "Employee Setup", description: "Hired candidates can be directly onboarded into the employee registry, auto-populating contact details." }
     ],
@@ -49,8 +49,8 @@ const STAGES: StepDetail[] = [
       "Organizational Chart tree hierarchy builder",
       "Role-Based Access Control permissions"
     ],
-    models: ["Department", "Designation", "UserRole"],
-    endpoints: ["/departments/", "/designations/", "/employees/tree/"],
+    models: ["Department", "Designation"],
+    endpoints: ["/api/departments/", "/api/designations/"],
     interdependencies: [
       { target: "Employee Setup", description: "Every employee must map to a valid department and designation before active payroll calculation." },
       { target: "Attendance & Leaves", description: "Shift scheduler rules and leave policies are applied to specific department codes." }
@@ -69,11 +69,11 @@ const STAGES: StepDetail[] = [
       "Detailed profile builder (basic, personal, bank, and family tabs)",
       "Availability status toggles (Active / Inactive)"
     ],
-    models: ["Employee", "User", "EmployeeProfile"],
-    endpoints: ["/employees/", "/employees/<id>/"],
+    models: ["Employee", "User"],
+    endpoints: ["/api/employees/", "/api/employees/<id>/", "/api/employees/tree/"],
     interdependencies: [
-      { target: "Onboarding & E-Sign", description: "Triggers onboarding checklist creation and issues document signature notifications." },
-      { target: "HRM & Timekeeping", description: "Creates attendance logs and sets leave balances based on the joining date." }
+      { target: "Compliance & Signing", description: "Triggers onboarding checklist creation and issues document signature notifications." },
+      { target: "Attendance & Leaves", description: "Creates attendance logs and sets leave balances based on the joining date." }
     ],
     color: "#7c3aed" // Purple
   },
@@ -89,8 +89,8 @@ const STAGES: StepDetail[] = [
       "Signature canvas drawing tool (Employee side)",
       "Audit logs capturing IP and client headers"
     ],
-    models: ["DocumentEsign", "DocumentSignature", "Asset", "AssetCategory"],
-    endpoints: ["/document-esign/", "/document-signature/", "/assets/"],
+    models: ["DocumentEsign", "DocumentSignature", "EmployeeDocument", "DocumentCategory", "AssetAssignment", "AssetCategory"],
+    endpoints: ["/api/esign-documents/", "/api/esign-signatures/", "/api/employee-documents/", "/api/asset-assignments/"],
     interdependencies: [
       { target: "Employee Setup", description: "Completed signatures mark profiles as compliance-cleared, updating onboarding maturity statistics." }
     ],
@@ -108,8 +108,8 @@ const STAGES: StepDetail[] = [
       "Timesheet logs & overtime records",
       "Shift rules & scheduler timetables"
     ],
-    models: ["LeaveRequest", "AttendanceRecord", "Timesheet", "ShiftRule"],
-    endpoints: ["/leave-requests/", "/attendance/", "/timesheets/"],
+    models: ["LeaveBalance", "LeaveLedger", "TimesheetEntry", "ShiftDefinition", "OvertimeEntry"],
+    endpoints: ["/api/leave-ledger/", "/api/timesheets/", "/api/shift-definitions/", "/api/overtime-entries/", "/api/data/attendance-employee/"],
     interdependencies: [
       { target: "Payroll & Finance", description: "Unpaid leave balances and overtime hours are directly piped into the monthly payroll engine." }
     ],
@@ -127,10 +127,10 @@ const STAGES: StepDetail[] = [
       "Automated Payslip generation & release",
       "Provident fund tracking & tax mapping"
     ],
-    models: ["SalaryComponent", "EmployeePayroll", "Payslip", "ExpenseClaim"],
-    endpoints: ["/salary-components/", "/employee-payroll/", "/payslips/", "/expense-claims/"],
+    models: ["ExpenseClaim", "Resource (employee-salaries, payroll-items)"],
+    endpoints: ["/api/expense-claims/", "/api/data/employee-salaries/", "/api/data/payroll-items/"],
     interdependencies: [
-      { target: "Offboarding", description: "Determines final payouts, remaining allowances, and severance terms." }
+      { target: "Offboarding Setup", description: "Determines final payouts, remaining allowances, and severance terms." }
     ],
     color: "#10b981" // Green
   },
@@ -146,14 +146,15 @@ const STAGES: StepDetail[] = [
       "Final settlement calculation desk",
       "Checklist release & asset recovery logs"
     ],
-    models: ["Promotion", "Resignation", "Termination", "FinalSettlement"],
-    endpoints: ["/promotions/", "/resignations/", "/terminations/", "/final-settlements/"],
+    models: ["OffboardingCase", "Resource (promotions, resignations, terminations)"],
+    endpoints: ["/api/offboarding-cases/", "/api/data/promotions/", "/api/data/resignations/", "/api/data/terminations/"],
     interdependencies: [
       { target: "Employee Setup", description: "Marks the profile status as Inactive, deauthorizes system login access, and updates org chart." }
     ],
     color: "#dc2626" // Red
   }
 ];
+
 
 const FlowBlueprint: React.FC = () => {
   const [activeStep, setActiveStep] = useState<string>("recruitment");
