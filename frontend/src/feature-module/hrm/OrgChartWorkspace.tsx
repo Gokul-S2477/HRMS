@@ -26,12 +26,13 @@ const orgChartStyles = `
   overflow: auto;
   padding: 40px;
   background: var(--hrms-card, #ffffff);
-  border-radius: 12px;
+  border-radius: 24px;
   border: 1px solid var(--hrms-border, #e2e8f0);
   display: flex;
   justify-content: center;
   min-height: 600px;
   position: relative;
+  box-shadow: 0 4px 24px rgba(20, 28, 45, 0.02);
 }
 .org-tree, .org-tree ul {
   display: flex;
@@ -59,14 +60,14 @@ const orgChartStyles = `
   position: absolute;
   top: 0;
   right: 50%;
-  border-top: 2px solid var(--hrms-primary, #3b82f6);
+  border-top: 2px solid var(--hrms-border, #cbd5e1);
   width: 50%;
   height: 24px;
 }
 .org-tree li::after {
   right: auto;
   left: 50%;
-  border-left: 2px solid var(--hrms-primary, #3b82f6);
+  border-left: 2px solid var(--hrms-border, #cbd5e1);
 }
 .org-tree li:only-child::after, .org-tree li:only-child::before {
   display: none;
@@ -78,7 +79,7 @@ const orgChartStyles = `
   border-top: 0 none;
 }
 .org-tree li:last-child::before {
-  border-right: 2px solid var(--hrms-primary, #3b82f6);
+  border-right: 2px solid var(--hrms-border, #cbd5e1);
   border-radius: 0 5px 0 0;
 }
 .org-tree li:first-child::after {
@@ -89,31 +90,34 @@ const orgChartStyles = `
   position: absolute;
   top: 0;
   left: 50%;
-  border-left: 2px solid var(--hrms-primary, #3b82f6);
+  border-left: 2px solid var(--hrms-border, #cbd5e1);
   width: 0;
   height: 24px;
 }
 .org-node-card {
   background: var(--hrms-card, #ffffff);
-  border: 1px solid var(--hrms-border, #cbd5e1);
-  border-radius: 12px;
-  padding: 16px;
-  width: 200px;
+  border: 2px solid var(--hrms-border, #cbd5e1);
+  border-top: 4px solid var(--hrms-accent, #F26522);
+  border-radius: 16px;
+  padding: 20px 16px;
+  width: 210px;
   text-align: center;
-  box-shadow: var(--hrms-shadow, 0 4px 6px -1px rgba(0,0,0,0.05));
-  transition: all 0.2s ease-in-out;
+  box-shadow: 0 8px 24px rgba(20, 28, 45, 0.04);
+  transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1.1), box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
   cursor: pointer;
   position: relative;
   z-index: 10;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 .org-node-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-  border-color: var(--hrms-primary, #3b82f6);
+  transform: translateY(-6px);
+  box-shadow: 0 16px 32px rgba(242, 101, 34, 0.1);
+  border-color: var(--hrms-accent, #F26522);
 }
 .org-node-card.selected {
-  border: 2px solid var(--hrms-primary, #3b82f6);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  border-color: var(--hrms-accent, #F26522);
+  box-shadow: 0 0 0 4px rgba(242, 101, 34, 0.15), 0 16px 32px rgba(242, 101, 34, 0.1);
 }
 .org-node-card.highlighted {
   animation: pulse-border 1.5s infinite;
@@ -125,34 +129,47 @@ const orgChartStyles = `
   100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 .org-node-avatar {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   object-fit: cover;
-  margin-bottom: 8px;
-  border: 2px solid var(--hrms-border, #cbd5e1);
+  margin-bottom: 10px;
+  border: 3px solid var(--hrms-card, #ffffff);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  background: #f8fafc;
 }
 .org-node-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--hrms-heading, #1e293b);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--hrms-ink, #1a2340);
   margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .org-node-title {
   font-size: 11px;
-  font-weight: 500;
-  color: var(--hrms-muted, #64748b);
-  margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--hrms-muted, #5a6782);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .org-node-dept {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--hrms-primary, #3b82f6);
-  background: var(--hrms-primary-soft, rgba(59,130,246,0.1));
-  padding: 1px 6px;
-  border-radius: 9999px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--hrms-accent, #F26522);
+  background: rgba(242, 101, 34, 0.05);
+  padding: 2px 8px;
+  border-radius: 20px;
   display: inline-block;
-  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .org-node-toggle {
   position: absolute;
@@ -171,11 +188,13 @@ const orgChartStyles = `
   cursor: pointer;
   z-index: 20;
   color: var(--hrms-muted, #64748b);
+  transition: all 0.2s ease;
 }
 .org-node-toggle:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-  border-color: #cbd5e1;
+  background: var(--hrms-accent, #F26522);
+  color: #ffffff;
+  border-color: var(--hrms-accent, #F26522);
+  transform: translateX(-50%) scale(1.1);
 }
 `;
 
@@ -282,7 +301,7 @@ const OrgChartWorkspace: React.FC = () => {
             alt={node.full_name}
             className="org-node-avatar"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = "/assets/images/avatar.png";
+              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(node.full_name)}&background=F26522&color=fff&size=128`;
             }}
           />
           <div className="org-node-name">{node.full_name}</div>
@@ -404,7 +423,7 @@ const OrgChartWorkspace: React.FC = () => {
                       className="rounded-circle mb-3 border"
                       style={{ width: "96px", height: "96px", objectFit: "cover" }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/assets/images/avatar.png";
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedNode.full_name)}&background=F26522&color=fff&size=128`;
                       }}
                     />
                     <h4 className="mb-1">{selectedNode.full_name}</h4>

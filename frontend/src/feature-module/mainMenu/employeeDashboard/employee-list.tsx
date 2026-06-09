@@ -376,7 +376,13 @@ const EmployeeList: React.FC = () => {
                         <tr key={employee.id}>
                           <td>
                             <div className="employee-identity">
-                              <img src={employeeAvatarSrc(employee)} alt={employee.first_name} />
+                              <img
+                                src={employeeAvatarSrc(employee)}
+                                alt={employee.first_name}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(employeeFullName(employee))}&background=F26522&color=fff&size=128`;
+                                }}
+                              />
                               <div>
                                 <div className="payroll-primary-text">{employeeFullName(employee)}</div>
                                 <div className="payroll-secondary-text">{employee.emp_code || "-"}</div>
