@@ -32,6 +32,7 @@ export const all_routes = {
   superAdminPackagesGrid: "/super-admin/package-grid",
   superAdminDomain: "/super-admin/domain",
   superAdminPurchaseTransaction: "/super-admin/purchase-transaction",
+  flowBlueprint: "/super-admin/flow-blueprint",
 
   // ----- Basic -----
   calendar: "/calendar",

@@ -74,6 +74,11 @@ export const HorizontalSidebarData = [
                 route: routes.superAdminPurchaseTransaction,
                 base: 'purchase-transaction',
               },
+              {
+                menuValue: 'Flow Blueprint',
+                route: routes.flowBlueprint,
+                base: 'flow-blueprint',
+              },
             ],
           },
           {

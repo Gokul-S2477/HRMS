@@ -123,6 +123,7 @@ export const APP_NAVIGATION: AppMenuSection[] = [
     items: [
       { label: "Stakeholder Access", icon: "users-plus", link: all_routes.manageusers, allowedRoles: SUPER_ONLY },
       { label: "Revenue Analytics", icon: "chart-infographic", link: all_routes.analytics, allowedRoles: SUPER_ONLY },
+      { label: "Flow Blueprint", icon: "binary-tree-2", link: all_routes.flowBlueprint, allowedRoles: SUPER_ONLY },
     ],
   },
 ];

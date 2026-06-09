@@ -119,6 +119,7 @@ import ProductivityTodosPage from "../liveops/ProductivityTodosPage";
 import ProductivityEventsPage from "../liveops/ProductivityEventsPage";
 import Manageusers from "../userManagement/manageusers";
 import Chat from "../application/chat";
+import FlowBlueprint from "../super-admin/FlowBlueprint";
 
 const HR_ALLOWED = ["super_admin", "hr"];
 const HR_EMPLOYEE_ALLOWED = ["super_admin", "hr", "employee"];
@@ -164,6 +165,7 @@ export const publicRoutes = [
 export const protectedRoutes = [
   { path: routes.adminDashboard, element: <AdminDashboard />, allowedRoles: ["super_admin", "hr"] },
   { path: routes.superAdminDashboard, element: <AdminDashboard />, allowedRoles: ["super_admin"] },
+  { path: routes.flowBlueprint, element: <FlowBlueprint />, allowedRoles: ["super_admin"] },
   { path: routes.employeeDashboard, element: <EmployeeDashboard />, allowedRoles: ["super_admin", "hr", "employee"] },
   { path: routes.leadsDashboard, element: <LeadsDashboard />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.dealsDashboard, element: <DealsDashboard />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
