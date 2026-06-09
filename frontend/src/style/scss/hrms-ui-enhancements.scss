@@ -682,3 +682,154 @@ p, span, label, td, th, li, a, button, input, select, textarea {
   .employee-form-layout { grid-template-columns: 1fr !important; }
   .finance-detail-grid  { grid-template-columns: 1fr !important; }
 }
+
+/* ── 43. ICON ALIGNMENT AND SYMBOL REFINEMENTS ─────────────────────── */
+
+/* General Tabler Icon default baseline alignment */
+.ti {
+  vertical-align: middle;
+  line-height: 1;
+}
+
+/* Sidebar Menu Layout, Indentation & Centering */
+.sidebar-menu li[data-depth="0"] > a {
+  padding: 10px 16px !important;
+}
+
+.sidebar-menu li[data-depth="1"] > a {
+  padding: 8px 16px 8px 32px !important;
+}
+
+.sidebar-menu li[data-depth="2"] > a {
+  padding: 8px 16px 8px 48px !important;
+}
+
+.sidebar-menu li a {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  text-decoration: none !important;
+  width: 100% !important;
+}
+
+/* Centering icons in the sidebar node container */
+.sidebar-node-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px !important;
+  border-radius: 10px !important;
+  transition: all var(--hrms-transition);
+}
+
+.sidebar-node-icon i {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Adjust submenu icon wrapper and font size for clean visual hierarchy */
+.sidebar-menu li[data-depth="1"] .sidebar-node-icon,
+.sidebar-menu li[data-depth="2"] .sidebar-node-icon {
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px !important;
+  border-radius: 8px !important;
+}
+
+.sidebar-menu li[data-depth="1"] .sidebar-node-icon i,
+.sidebar-menu li[data-depth="2"] .sidebar-node-icon i {
+  font-size: 14px !important;
+}
+
+/* Fix kicker icon alignment */
+.payroll-kicker {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  gap: 8px !important;
+  line-height: 1.2 !important;
+}
+
+.payroll-kicker i {
+  font-size: 14px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}
+
+/* KPI Card icons centering */
+.employee-kpi-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.employee-kpi-icon i {
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}
+
+/* Buttons and inline action icon alignment */
+.btn, .btn-primary, .btn-light, .btn-white {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+
+.btn i, .btn-primary i, .btn-light i, .btn-white i {
+  font-size: 15px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}
+
+/* Head icons and header collapse buttons alignment */
+.head-icons {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.head-icons a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--hrms-border) !important;
+  color: var(--hrms-muted) !important;
+  background: var(--hrms-card) !important;
+  transition: all var(--hrms-transition) !important;
+}
+.head-icons a:hover {
+  color: var(--hrms-accent) !important;
+  border-color: var(--hrms-accent) !important;
+  background: rgba(242, 101, 34, 0.05) !important;
+}
+.head-icons a i {
+  font-size: 16px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
