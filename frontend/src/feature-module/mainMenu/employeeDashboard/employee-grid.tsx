@@ -254,60 +254,97 @@ const EmployeeGrid: React.FC = () => {
                 const completion = profileCompletion(employee);
                 return (
                   <div className="employee-directory-card" key={employee.id}>
+                    {/* ID Card Lanyard Header */}
+                    <div className="employee-id-banner" />
+
                     <div className="card-body">
-                      <div className="d-flex justify-content-between align-items-start gap-3 mb-4">
-                        <div className="employee-identity">
-                          <img src={employeeAvatarSrc(employee)} alt={employee.first_name} />
-                          <div>
-                            <div className="payroll-primary-text">{employeeFullName(employee)}</div>
-                            <div className="payroll-secondary-text">{employee.emp_code || "Employee code pending"}</div>
-                          </div>
-                        </div>
-                        <button type="button" className={`payroll-badge ${employee.is_active ? "success" : "danger"}`} onClick={() => toggleStatus(employee)}>
-                          <i className="ti ti-point-filled" />
-                          {employee.is_active ? "Active" : "Inactive"}
-                        </button>
+                      {/* Floating status badge */}
+                      <button
+                        type="button"
+                        className={`employee-status-badge ${employee.is_active ? "success" : "danger"}`}
+                        onClick={() => toggleStatus(employee)}
+                      >
+                        <i className="ti ti-point-filled" />
+                        {employee.is_active ? "Active" : "Inactive"}
+                      </button>
+
+                      {/* Centered Avatar Frame */}
+                      <div className="employee-avatar-frame">
+                        <img
+                          src={employeeAvatarSrc(employee)}
+                          alt={employee.first_name}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(employeeFullName(employee))}&background=F26522&color=fff&size=128`;
+                          }}
+                        />
                       </div>
 
-                      <div className="employee-contact-list mb-3">
-                        <span className="employee-contact-item"><i className="ti ti-building" /> {employee.department?.name || "Department pending"}</span>
-                        <span className="employee-contact-item"><i className="ti ti-id-badge-2" /> {employee.designation?.title || employee.role || "Designation pending"}</span>
-                        <span className="employee-contact-item"><i className="ti ti-mail" /> {employee.email || "-"}</span>
-                        <span className="employee-contact-item"><i className="ti ti-phone" /> {employee.phone || "-"}</span>
+                      {/* ID Text Metadata */}
+                      <div className="employee-name">{employeeFullName(employee)}</div>
+                      <span className="employee-code">{employee.emp_code || "Employee code pending"}</span>
+
+                      {/* ID Card Fields block */}
+                      <div className="employee-id-fields">
+                        <div className="employee-id-field-row">
+                          <i className="ti ti-building" />
+                          <span>{employee.department?.name || "Department pending"}</span>
+                        </div>
+                        <div className="employee-id-field-row">
+                          <i className="ti ti-id-badge-2" />
+                          <span>{employee.designation?.title || employee.role || "Designation pending"}</span>
+                        </div>
+                        <div className="employee-id-field-row">
+                          <i className="ti ti-mail" />
+                          <span>{employee.email || "-"}</span>
+                        </div>
+                        <div className="employee-id-field-row">
+                          <i className="ti ti-phone" />
+                          <span>{employee.phone || "-"}</span>
+                        </div>
                       </div>
 
-                      <div className="finance-metric-stack mb-4">
-                        <div className="d-flex justify-content-between align-items-center gap-3">
-                          <span className="payroll-secondary-text">Profile completion</span>
-                          <strong>{completion}%</strong>
+                      {/* Onboarding Stack */}
+                      <div className="employee-onboarding-stack">
+                        <div className="employee-onboarding-header">
+                          <span>Profile completion</span>
+                          <span>{completion}%</span>
                         </div>
-                        <div className="finance-progress-track">
-                          <div className={`finance-progress-bar ${completion >= 85 ? "success" : completion >= 60 ? "warning" : "danger"}`} style={{ width: `${Math.max(completion, 6)}%` }} />
+                        <div className="employee-progress-track">
+                          <div
+                            className={`employee-progress-bar ${completion >= 85 ? "success" : completion >= 60 ? "warning" : "danger"}`}
+                            style={{ width: `${Math.max(completion, 6)}%` }}
+                          />
                         </div>
-                        <div className="d-flex justify-content-between payroll-secondary-text">
+                        <div className="d-flex justify-content-between payroll-secondary-text" style={{ fontSize: "11px" }}>
                           <span>{employee.employment_type || "Employment type pending"}</span>
                           <span>{calculateTenureLabel(employee.joining_date)}</span>
                         </div>
                       </div>
 
-                      <div className="row g-2 mb-4">
-                        <div className="col-6">
-                          <div className="employee-badge-soft w-100 justify-content-center">
-                            <i className="ti ti-calendar" /> {formatDisplayDate(employee.joining_date)}
-                          </div>
+                      {/* Badges row */}
+                      <div className="employee-id-badges-row">
+                        <div className="employee-badge-item-soft">
+                          <i className="ti ti-calendar" /> {formatDisplayDate(employee.joining_date)}
                         </div>
-                        <div className="col-6">
-                          <div className="employee-badge-soft w-100 justify-content-center">
-                            <i className="ti ti-user-heart" /> {calculateAge(employee.date_of_birth) || "-"} yrs
-                          </div>
+                        <div className="employee-badge-item-soft">
+                          <i className="ti ti-user-heart" /> {calculateAge(employee.date_of_birth) || "-"} yrs
                         </div>
                       </div>
 
-                      <div className="d-flex gap-2">
-                        <button type="button" className="btn btn-white flex-fill" onClick={() => navigate(all_routes.employeeDetailsView.replace(":id", String(employee.id)))}>
+                      {/* Card Action buttons */}
+                      <div className="employee-id-actions">
+                        <button
+                          type="button"
+                          className="btn btn-white flex-fill"
+                          onClick={() => navigate(all_routes.employeeDetailsView.replace(":id", String(employee.id)))}
+                        >
                           <i className="ti ti-eye me-1" /> Profile
                         </button>
-                        <button type="button" className="btn btn-primary flex-fill" onClick={() => navigate(`${all_routes.employeeAdd}?id=${employee.id}`)}>
+                        <button
+                          type="button"
+                          className="btn btn-primary flex-fill"
+                          onClick={() => navigate(`${all_routes.employeeAdd}?id=${employee.id}`)}
+                        >
                           <i className="ti ti-edit me-1" /> Edit
                         </button>
                       </div>
