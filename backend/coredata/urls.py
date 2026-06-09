@@ -37,6 +37,9 @@ from .workflow_views import (
     ReportsOverviewView,
     ShiftDefinitionViewSet,
     TimesheetEntryViewSet,
+    ExpenseClaimViewSet,
+    DocumentEsignViewSet,
+    DocumentSignatureViewSet,
 )
 
 router = DefaultRouter()
@@ -45,6 +48,7 @@ router.register(r"leave-balances", LeaveBalanceViewSet, basename="leave-balances
 router.register(r"leave-ledger", LeaveLedgerViewSet, basename="leave-ledger")
 router.register(r"shift-definitions", ShiftDefinitionViewSet, basename="shift-definitions")
 router.register(r"timesheets", TimesheetEntryViewSet, basename="timesheets")
+router.register(r"expense-claims", ExpenseClaimViewSet, basename="expense-claims")
 router.register(r"overtime-entries", OvertimeEntryViewSet, basename="overtime-entries")
 router.register(r"asset-categories", AssetCategoryViewSet, basename="asset-categories")
 router.register(r"asset-assignments", AssetAssignmentViewSet, basename="asset-assignments")
@@ -62,6 +66,8 @@ router.register(r"recruitment/referrals", RecruitmentReferralViewSet, basename="
 router.register(r"productivity/notes", ProductivityNoteViewSet, basename="productivity-notes")
 router.register(r"productivity/todos", ProductivityTodoViewSet, basename="productivity-todos")
 router.register(r"productivity/events", ReminderEventViewSet, basename="productivity-events")
+router.register(r"esign-documents", DocumentEsignViewSet, basename="esign-documents")
+router.register(r"esign-signatures", DocumentSignatureViewSet, basename="esign-signatures")
 
 urlpatterns = [
     path("public/jobs/", PublicRecruitmentJobsView.as_view(), name="public-jobs"),

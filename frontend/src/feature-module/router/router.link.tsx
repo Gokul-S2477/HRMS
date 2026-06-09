@@ -49,6 +49,8 @@ import AttendanceEmployee from "../hrm/attendance-employee";
 import TimesheetsPage from "../hrm/timesheets";
 import OvertimePage from "../hrm/overtime";
 import ShiftRulesPage from "../hrm/shift-rules";
+import ExpensesWorkspace from "../hrm/ExpensesWorkspace";
+import OrgChartWorkspace from "../hrm/OrgChartWorkspace";
 
 import Tickets from "../tickets/tickets";
 import TicketDetails from "../tickets/ticket-details";
@@ -108,6 +110,8 @@ import OnboardingTemplatesPage from "../liveops/OnboardingTemplatesPage";
 import OnboardingDeskPage from "../liveops/OnboardingDeskPage";
 import ApprovalInboxPage from "../liveops/ApprovalInboxPage";
 import AuditTrailPage from "../liveops/AuditTrailPage";
+import ESignDesk from "../liveops/ESignDesk";
+import ESignWorkspace from "../liveops/ESignWorkspace";
 import ReportsWorkspace from "../liveops/ReportsWorkspace";
 import SettingsControlCenter from "../liveops/SettingsControlCenter";
 import ProductivityNotesPage from "../liveops/ProductivityNotesPage";
@@ -205,6 +209,9 @@ export const protectedRoutes = [
   { path: routes.timesheet, element: <TimesheetsPage />, allowedRoles: HR_EMPLOYEE_ALLOWED },
   { path: routes.scheduletiming, element: <ShiftRulesPage />, allowedRoles: HR_ALLOWED },
   { path: routes.overtime, element: <OvertimePage />, allowedRoles: HR_EMPLOYEE_ALLOWED },
+  { path: routes.expenseClaims, element: <ExpensesWorkspace resource="/expense-claims/" title="My Expense Claims" subtitle="Track and submit your business expense reimbursements." buttonLabel="Submit Expense Claim" audience="My" mode="employee" />, allowedRoles: HR_EMPLOYEE_ALLOWED },
+  { path: routes.expenseApprovals, element: <ExpensesWorkspace resource="/expense-claims/" title="Expense Claims Review" subtitle="Approve, reject, and verify employee reimbursement claims." buttonLabel="Review Claim" audience="All" mode="approval" />, allowedRoles: HR_ALLOWED },
+  { path: routes.orgChart, element: <OrgChartWorkspace />, allowedRoles: HR_EMPLOYEE_ALLOWED },
 
   { path: routes.tickets, element: <Tickets />, allowedRoles: HR_EMPLOYEE_ALLOWED },
   { path: routes.ticketList, element: <Tickets />, allowedRoles: HR_EMPLOYEE_ALLOWED },
@@ -267,6 +274,8 @@ export const protectedRoutes = [
   { path: routes.onboardingDesk, element: <OnboardingDeskPage />, allowedRoles: ["super_admin", "hr", "employee", "stakeholder"] },
   { path: routes.approvalInbox, element: <ApprovalInboxPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.auditTrail, element: <AuditTrailPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
+  { path: routes.eSignDesk, element: <ESignDesk />, allowedRoles: ["super_admin", "hr"] },
+  { path: routes.eSignWorkspace, element: <ESignWorkspace />, allowedRoles: ["super_admin", "hr", "employee"] },
 
   { path: routes.expensesreport, element: <ReportsWorkspace />, allowedRoles: REPORT_ALLOWED },
   { path: routes.invoicereport, element: <ReportsWorkspace />, allowedRoles: REPORT_ALLOWED },

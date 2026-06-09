@@ -1658,3 +1658,36 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =======================================================
+   PAYROLL-UI PATCH: text-visibility & overflow fixes
+   ======================================================= */
+.payroll-summary-row { color: #1a2340; }
+.payroll-summary-row span:first-child { color: #5a6782; }
+.payroll-summary-row strong { color: #1a2340; }
+.payroll-kpi-pill { color: #1a2340; }
+.payroll-toolbar .form-label { color: #5a6782 !important; }
+.payroll-panel h5, .payroll-panel h6 { color: #1a2340; }
+.payroll-table-shell table td { color: #374151 !important; }
+.payroll-badge { color: #1a2340 !important; }
+.payroll-badge.accent  { color: #d9561a !important; }
+.payroll-badge.success { color: #065f46 !important; }
+.payroll-badge.warning { color: #92400e !important; }
+.payroll-badge.danger  { color: #991b1b !important; }
+.payroll-badge.info    { color: #1e40af !important; }
+.payroll-extra-row { color: #374151; }
+.payroll-summary-highlight,
+.payroll-summary-highlight small,
+.payroll-summary-highlight h3 { color: #fff !important; }
+.employee-chip { color: #1a2340 !important; }
+.crm-bar-row span, .crm-funnel-step strong { color: #1a2340 !important; }
+.finance-inline-pair { color: #5a6782; }
+.finance-inline-pair strong { color: #1a2340; }
+.payroll-subtitle { max-width: 100%; word-break: break-word; }
+.payroll-table-shell table thead th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+

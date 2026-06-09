@@ -813,6 +813,82 @@ export const TowColData = [
                 ],
               },
               {
+                menuValue: 'Documents',
+                base: 'documents',
+                hasSubRoute: true,
+                showSubRoute: false,
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Employee Documents',
+                    route: routes.employeeDocuments,
+                    base: '/documents/employee-documents',
+                  },
+                  {
+                    menuValue: 'Document Categories',
+                    route: routes.documentCategories,
+                    base: '/documents/document-categories',
+                  },
+                ],
+              },
+              {
+                menuValue: 'Onboarding',
+                base: 'onboarding',
+                hasSubRoute: true,
+                showSubRoute: false,
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Onboarding Desk',
+                    route: routes.onboardingDesk,
+                    base: '/onboarding/onboarding-desk',
+                  },
+                  {
+                    menuValue: 'Templates',
+                    route: routes.onboardingTemplates,
+                    base: '/onboarding/templates',
+                  },
+                ],
+              },
+              {
+                menuValue: 'E-Sign',
+                base: 'esign',
+                hasSubRoute: true,
+                showSubRoute: false,
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'E-Sign Desk',
+                    route: routes.eSignDesk,
+                    base: '/esign/esign-desk',
+                  },
+                  {
+                    menuValue: 'My Signatures',
+                    route: routes.eSignWorkspace,
+                    base: '/esign/esign-workspace',
+                  },
+                ],
+              },
+              {
+                menuValue: 'Approvals',
+                base: 'approvals',
+                hasSubRoute: true,
+                showSubRoute: false,
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Approval Inbox',
+                    route: routes.approvalInbox,
+                    base: '/approvals/approval-inbox',
+                  },
+                  {
+                    menuValue: 'Audit Trail',
+                    route: routes.auditTrail,
+                    base: '/approvals/audit-trail',
+                  },
+                ],
+              },
+              {
                 menuValue: 'Help & Supports',
                 base: 'supports',
                 hasSubRoute: true,

@@ -14,6 +14,8 @@ from coredata.models import (
     OnboardingTemplate,
     RecruitmentJob,
     Resource,
+    DocumentEsign,
+    DocumentSignature,
 )
 from employees.models import Department, Designation, Employee
 from payroll.models import EmployeePayroll, FinalSettlement
@@ -351,3 +353,142 @@ class RolePermissionSmokeTests(TestCase):
             format="json",
         )
         self.assertEqual(create_denied.status_code, 403)
+
+    def test_profile_update_request_workflow(self):
+        # 1. Employee submits a profile update request
+        self.auth(self.employee_user)
+        proposed_changes = {
+            "phone": "9999999999",
+            "bank_info": {"bank_name": "New International Bank", "account_number": "9876543210"}
+        }
+        current_data = {
+            "phone": self.employee_one.phone,
+            "bank_info": self.employee_one.bank_info
+        }
+        
+        response = self.client.post(
+            "/api/data/profile-update-requests/",
+            {
+                "data": {
+                    "section": "bank",
+                    "proposed_changes": proposed_changes,
+                    "current_data": current_data
+                }
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        request_id = response.data["id"]
+        self.assertEqual(response.data["data"]["status"], "Pending")
+        self.assertEqual(response.data["data"]["employee_id"], self.employee_one.id)
+        
+        # Verify employee scoping: Asha cannot view other employee's requests if created (and she can view hers)
+        get_response = self.client.get("/api/data/profile-update-requests/")
+        self.assertEqual(get_response.status_code, 200)
+        self.assertGreaterEqual(len(get_response.data), 1)
+        
+        # 2. HR views the approval inbox and sees the request
+        self.auth(self.hr_user)
+        inbox_response = self.client.get("/api/approvals/inbox/")
+        self.assertEqual(inbox_response.status_code, 200)
+        items = inbox_response.data["items"]
+        profile_items = [it for it in items if it["scope"] == "profile_update"]
+        self.assertEqual(len(profile_items), 1)
+        self.assertEqual(profile_items[0]["id"], str(request_id))
+        
+        # 3. HR approves the request
+        approve_response = self.client.post(
+            "/api/approvals/inbox/",
+            {
+                "scope": "profile_update",
+                "id": str(request_id),
+                "decision": "approve",
+                "note": "Bank details look correct."
+            },
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, 200)
+        
+        # 4. Verify request status is updated to Approved
+        req_check = Resource.objects.get(pk=request_id)
+        self.assertEqual(req_check.data["status"], "Approved")
+        self.assertEqual(req_check.data["comments"], "Bank details look correct.")
+        
+        # 5. Verify Employee record was updated in the database
+        self.employee_one.refresh_from_db()
+        self.assertEqual(self.employee_one.phone, "9999999999")
+        self.assertEqual(self.employee_one.bank_info["bank_name"], "New International Bank")
+        self.assertEqual(self.employee_one.bank_info["account_number"], "9876543210")
+
+    def test_document_esign_and_signature_workflow(self):
+        # 1. Non-HR cannot create an E-Sign document
+        self.auth(self.employee_user)
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        
+        pdf_file = SimpleUploadedFile("contract.pdf", b"pdf content", content_type="application/pdf")
+        
+        response = self.client.post(
+            "/api/esign-documents/",
+            {
+                "title": "Employee Agreement",
+                "description": "Please sign",
+                "file": pdf_file,
+                "distribution_type": "all",
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 403)
+
+        # 2. HR can create and distribute an E-Sign document
+        self.auth(self.hr_user)
+        pdf_file.seek(0)
+        response = self.client.post(
+            "/api/esign-documents/",
+            {
+                "title": "Employee Agreement",
+                "description": "Please sign",
+                "file": pdf_file,
+                "distribution_type": "all",
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        doc_id = response.data["id"]
+
+        # 3. Check that DocumentSignature records were auto-generated for active employees (Asha and Ravi)
+        signatures = DocumentSignature.objects.filter(document_id=doc_id)
+        self.assertEqual(signatures.count(), 2)
+        
+        # 4. Employee Asha can view and sign their own signature record
+        self.auth(self.employee_user)
+        asha_sig = signatures.get(employee=self.employee_one)
+        
+        # Verify employee can see their own signatures
+        sig_list_response = self.client.get("/api/esign-signatures/")
+        self.assertEqual(sig_list_response.status_code, 200)
+        self.assertEqual(len(sig_list_response.data), 1)
+        self.assertEqual(sig_list_response.data[0]["id"], asha_sig.id)
+
+        # Try signing as employee
+        sign_response = self.client.patch(
+            f"/api/esign-signatures/{asha_sig.id}/",
+            {"status": "signed"},
+            format="json",
+        )
+        self.assertEqual(sign_response.status_code, 200)
+        self.assertEqual(sign_response.data["status"], "signed")
+        
+        # Verify IP and signed_at are recorded
+        asha_sig.refresh_from_db()
+        self.assertEqual(asha_sig.status, "signed")
+        self.assertIsNotNone(asha_sig.signed_at)
+        
+        # 5. Asha cannot sign Ravi's signature record
+        ravi_sig = signatures.get(employee=self.employee_two)
+        sign_denied = self.client.patch(
+            f"/api/esign-signatures/{ravi_sig.id}/",
+            {"status": "signed"},
+            format="json",
+        )
+        self.assertEqual(sign_denied.status_code, 404)
+

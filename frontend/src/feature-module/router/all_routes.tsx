@@ -344,6 +344,9 @@ export const all_routes = {
   timesheet: "/timesheets",
   scheduletiming: "/schedule-timing",
   overtime: "/overtime",
+  expenseClaims: "/expenses",
+  expenseApprovals: "/admin/expense-approvals",
+  orgChart: "/org-chart",
   promotion: "/promotion",
   resignation: "/resignation",
   termination: "/termination",
@@ -359,6 +362,8 @@ export const all_routes = {
   onboardingDesk: "/onboarding/desk",
   approvalInbox: "/approvals/inbox",
   auditTrail: "/audit-trail",
+  eSignDesk: "/esign/desk",
+  eSignWorkspace: "/esign/workspace",
   users: "/users",
   rolePermission: "/roles-permissions",
 

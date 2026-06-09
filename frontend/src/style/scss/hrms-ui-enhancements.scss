@@ -1,0 +1,684 @@
+/* =======================================================================
+   HRMS GLOBAL UI ENHANCEMENT STYLESHEET
+   Covers: text visibility, layout overflow, table readability,
+   modal usability, sidebar, header, forms, badges, performance.
+   Applies to ALL modules & sub-modules.
+   ======================================================================= */
+
+/* ── 1. GOOGLE FONT (Inter) ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ── 2. CSS DESIGN TOKENS ──────────────────────────────────────────── */
+:root {
+  --hrms-font: 'Inter', 'Roboto', sans-serif;
+  --hrms-ink:       #1a2340;
+  --hrms-ink-2:     #374151;
+  --hrms-muted:     #5a6782;
+  --hrms-border:    #e2e8f0;
+  --hrms-surface:   #f8fafc;
+  --hrms-card:      #ffffff;
+  --hrms-accent:    #F26522;
+  --hrms-accent-dk: #d9561a;
+  --hrms-radius:    16px;
+  --hrms-radius-sm: 10px;
+  --hrms-radius-lg: 24px;
+  --hrms-shadow:    0 2px 12px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --hrms-shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.05);
+  --hrms-transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 3. GLOBAL FONT & TEXT BASELINE ────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--hrms-font) !important;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hrms-ink-2);
+  background-color: var(--hrms-surface);
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--hrms-font) !important;
+  color: var(--hrms-ink);
+  font-weight: 700;
+  line-height: 1.3;
+  /* prevent text from being invisible on colored backgrounds */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+p, span, label, td, th, li, a, button, input, select, textarea {
+  font-family: var(--hrms-font) !important;
+}
+
+/* Ensure all text on dark/coloured backgrounds stays readable */
+.bg-primary *, .btn-primary * { color: #fff; }
+.badge, .payroll-kicker, .payroll-badge { white-space: normal; word-break: break-word; }
+
+/* ── 4. LAYOUT & PAGE WRAPPER ──────────────────────────────────────── */
+.page-wrapper {
+  background-color: var(--hrms-surface);
+}
+
+.content {
+  padding: 20px 24px !important;
+}
+
+/* Prevent content being clipped by sidebar */
+@media (max-width: 991.98px) {
+  .content { padding: 16px !important; }
+}
+
+/* ── 5. CARDS ───────────────────────────────────────────────────────── */
+.card {
+  border: 1px solid var(--hrms-border);
+  border-radius: var(--hrms-radius) !important;
+  background: var(--hrms-card);
+  box-shadow: var(--hrms-shadow);
+  overflow: hidden;
+  /* GPU-composited — avoids layout thrash on hover */
+  will-change: box-shadow;
+  transition: box-shadow var(--hrms-transition);
+}
+
+.card:hover {
+  box-shadow: var(--hrms-shadow-lg);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--hrms-border);
+  padding: 18px 20px;
+  font-weight: 700;
+  color: var(--hrms-ink);
+}
+
+.card-body { padding: 20px; }
+.card-footer {
+  background: transparent;
+  border-top: 1px solid var(--hrms-border);
+  padding: 14px 20px;
+}
+
+/* ── 6. TABLES ─────────────────────────────────────────────────────── */
+.table {
+  font-size: 13.5px;
+  color: var(--hrms-ink-2);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table thead th {
+  padding: 14px 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hrms-muted);
+  background: var(--hrms-surface);
+  border-bottom: 2px solid var(--hrms-border);
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  transition: background-color var(--hrms-transition);
+}
+
+.table tbody tr:hover { background-color: #fff9f6; }
+
+.table tbody td {
+  padding: 14px 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--hrms-border);
+  color: var(--hrms-ink-2);
+  /* stop text truncation on narrow cells */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 80px;
+}
+
+/* table-responsive: smooth horizontal scroll, no clipping */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #c8d0dc transparent;
+}
+.table-responsive::-webkit-scrollbar { height: 6px; }
+.table-responsive::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(31, 42, 68, 0.18);
+}
+
+/* ── 7. FORMS ──────────────────────────────────────────────────────── */
+.form-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hrms-muted);
+  margin-bottom: 6px;
+}
+
+.form-control,
+.form-select {
+  min-height: 44px;
+  border: 1px solid var(--hrms-border);
+  border-radius: var(--hrms-radius-sm) !important;
+  background-color: #fff;
+  color: var(--hrms-ink);
+  font-size: 14px;
+  transition: border-color var(--hrms-transition), box-shadow var(--hrms-transition);
+  padding: 10px 14px;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--hrms-accent);
+  box-shadow: 0 0 0 3px rgba(242, 101, 34, 0.14);
+  outline: none;
+}
+
+.form-control::placeholder { color: #b0bac9; }
+
+.form-control-sm,
+.form-select-sm { min-height: 36px; font-size: 13px; }
+
+/* ── 8. BUTTONS ────────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--hrms-font) !important;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: var(--hrms-radius-sm) !important;
+  padding: 9px 18px;
+  transition: all var(--hrms-transition);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.btn:focus { box-shadow: none !important; }
+
+.btn-primary {
+  background: linear-gradient(135deg, #f97a35 0%, var(--hrms-accent) 100%);
+  border-color: var(--hrms-accent);
+  color: #fff !important;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--hrms-accent) 0%, var(--hrms-accent-dk) 100%);
+  border-color: var(--hrms-accent-dk);
+}
+
+.btn-outline-primary {
+  color: var(--hrms-accent);
+  border-color: var(--hrms-accent);
+}
+.btn-outline-primary:hover {
+  background: var(--hrms-accent);
+  color: #fff !important;
+}
+
+/* ── 9. BADGES ─────────────────────────────────────────────────────── */
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+/* ── 10. MODALS ────────────────────────────────────────────────────── */
+.modal-content {
+  border: none;
+  border-radius: var(--hrms-radius-lg) !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18) !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--hrms-border);
+  background: #fff;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--hrms-ink);
+}
+
+.modal-body {
+  padding: 24px;
+  max-height: min(75vh, 800px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  /* GPU paint for scroll performance */
+  will-change: scroll-position;
+}
+
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(31, 42, 68, 0.15);
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--hrms-border);
+  background: #fbfcfe;
+  gap: 10px;
+}
+
+/* ── 11. DROPDOWNS ─────────────────────────────────────────────────── */
+.dropdown-menu {
+  border: 1px solid var(--hrms-border);
+  border-radius: var(--hrms-radius) !important;
+  box-shadow: var(--hrms-shadow-lg);
+  padding: 8px;
+  min-width: 180px;
+  animation: hrms-dropdown-in 0.14s ease;
+}
+
+@keyframes hrms-dropdown-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--hrms-ink-2);
+  font-weight: 500;
+  transition: background var(--hrms-transition), color var(--hrms-transition);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: rgba(242, 101, 34, 0.08);
+  color: var(--hrms-accent);
+}
+
+/* ── 12. SIDEBAR TEXT VISIBILITY ────────────────────────────────────── */
+.sidebar {
+  /* ensure sidebar labels never get clipped */
+  .menu-title,
+  .submenu-title,
+  .sidebar-menu li a,
+  .sidebar-menu li span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
+  }
+}
+
+/* ── 13. HEADER ─────────────────────────────────────────────────────── */
+.header {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-bottom: 1px solid var(--hrms-border) !important;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* ── 14. PAGE HEADER ────────────────────────────────────────────────── */
+.page-header {
+  margin-bottom: 20px !important;
+}
+
+.page-header h3,
+.page-header h4 {
+  color: var(--hrms-ink) !important;
+  font-weight: 700 !important;
+}
+
+/* ── 15. PAYROLL-SHELL TEXT FIXES ───────────────────────────────────── */
+.payroll-shell,
+.employee-shell,
+.crm-shell,
+.careers-shell {
+  /* ensure all text within custom shells is visible */
+  color: var(--hrms-ink-2);
+}
+
+.payroll-title { color: var(--hrms-ink) !important; font-size: 30px; }
+.payroll-subtitle { color: var(--hrms-muted) !important; }
+.payroll-stat-label { color: var(--hrms-muted) !important; }
+.payroll-stat-value { color: var(--hrms-ink) !important; }
+.payroll-stat-meta { color: var(--hrms-muted) !important; }
+.payroll-primary-text { color: var(--hrms-ink) !important; }
+.payroll-secondary-text { color: var(--hrms-muted) !important; }
+
+/* Table inside payroll shell – force visible text */
+.payroll-table-shell table thead th {
+  color: var(--hrms-muted) !important;
+  background: var(--hrms-surface) !important;
+}
+.payroll-table-shell table tbody td {
+  color: var(--hrms-ink-2) !important;
+}
+
+/* ── 16. HRM MODULE – LEAVES, ATTENDANCE, TIMESHEETS ───────────────── */
+.hrm-page table td,
+.hrm-page table th {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ── 17. EMPLOYEE DETAIL PAGE ───────────────────────────────────────── */
+.employee-detail-stat small { color: var(--hrms-muted) !important; }
+.employee-detail-stat strong { color: var(--hrms-ink) !important; }
+.employee-summary-row span { color: var(--hrms-muted) !important; }
+
+/* Tabs – make active text clearly visible */
+.nav-tabs .nav-link {
+  color: var(--hrms-muted);
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0 !important;
+  transition: color var(--hrms-transition), border-color var(--hrms-transition);
+}
+.nav-tabs .nav-link:hover { color: var(--hrms-accent); }
+.nav-tabs .nav-link.active {
+  color: var(--hrms-accent) !important;
+  border-bottom-color: var(--hrms-accent);
+  background: transparent;
+  font-weight: 700;
+}
+
+/* ── 18. RECRUITMENT MODULE ─────────────────────────────────────────── */
+.careers-job-card .card-body h5 { color: var(--hrms-ink) !important; }
+.careers-meta-row span { color: var(--hrms-muted) !important; }
+
+/* ── 19. CRM MODULE ─────────────────────────────────────────────────── */
+.crm-meta-card strong,
+.crm-detail-card strong { color: var(--hrms-ink) !important; }
+.crm-meta-card span,
+.crm-detail-card span { color: var(--hrms-muted) !important; }
+.crm-pipeline-column-header h6 { color: var(--hrms-ink) !important; }
+
+/* ── 20. APPROVAL INBOX / ONBOARDING DESK ──────────────────────────── */
+.onboarding-step-title,
+.approval-row-title {
+  color: var(--hrms-ink) !important;
+  font-weight: 600;
+}
+.onboarding-step-meta,
+.approval-row-meta {
+  color: var(--hrms-muted) !important;
+  font-size: 13px;
+}
+
+/* ── 21. AUDIT TRAIL ────────────────────────────────────────────────── */
+.audit-log-entry .text-muted { color: var(--hrms-muted) !important; }
+
+/* ── 22. PERFORMANCE & APPRAISAL ────────────────────────────────────── */
+.performance-card h6,
+.appraisal-title { color: var(--hrms-ink) !important; }
+
+/* ── 23. PRODUCTIVITY PAGES (Notes, Todos, Events) ──────────────────── */
+.productivity-note-card h5,
+.productivity-event-card h5,
+.productivity-task-card h6 { color: var(--hrms-ink) !important; }
+.productivity-note-copy { color: #4a5568 !important; }
+.productivity-note-meta { color: var(--hrms-muted) !important; }
+
+/* ── 24. SETTINGS CONTROL CENTER ───────────────────────────────────── */
+.payroll-section-title { color: var(--hrms-ink) !important; }
+.payroll-section-card .card-body label { color: var(--hrms-muted); }
+
+/* ── 25. CHARTS – ensure axis labels visible ───────────────────────── */
+.apexcharts-text,
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+  fill: var(--hrms-muted) !important;
+  font-family: var(--hrms-font) !important;
+  font-size: 12px !important;
+}
+
+/* ── 26. PAGINATION ─────────────────────────────────────────────────── */
+.pagination {
+  gap: 4px;
+}
+.page-item .page-link {
+  border-radius: var(--hrms-radius-sm) !important;
+  border: 1px solid var(--hrms-border);
+  color: var(--hrms-ink);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 12px;
+  transition: all var(--hrms-transition);
+}
+.page-item.active .page-link {
+  background: var(--hrms-accent);
+  border-color: var(--hrms-accent);
+  color: #fff;
+}
+.page-item .page-link:hover:not(.active) {
+  background: rgba(242, 101, 34, 0.08);
+  color: var(--hrms-accent);
+}
+
+/* ── 27. ALERTS & TOASTS ────────────────────────────────────────────── */
+.alert {
+  border-radius: var(--hrms-radius-sm) !important;
+  border-width: 0;
+  border-left: 4px solid;
+}
+.alert-success { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+.alert-warning { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+.alert-danger  { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+.alert-info    { border-color: #3b82f6; background: #eff6ff; color: #1e40af; }
+
+/* ── 28. INPUTS INSIDE DARK-HEADER AREAS ───────────────────────────── */
+/* Prevent white text on white input */
+.modal-header input,
+.payroll-hero input,
+.employee-detail-banner input {
+  color: var(--hrms-ink) !important;
+  background: #fff !important;
+}
+
+/* ── 29. SEARCH INPUTS ─────────────────────────────────────────────── */
+.search-icon-wrap { position: relative; }
+.search-icon-wrap input.form-control { padding-left: 40px; }
+.search-icon-wrap i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--hrms-muted);
+  pointer-events: none;
+}
+
+/* ── 30. STAT CARDS / KPI CARDS ─────────────────────────────────────── */
+.payroll-stat-card,
+.employee-kpi-card {
+  /* use transform for hover — avoids layout shift (performance) */
+  transition: transform var(--hrms-transition), box-shadow var(--hrms-transition);
+  will-change: transform;
+}
+.payroll-stat-card:hover,
+.employee-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--hrms-shadow-lg);
+}
+
+/* ── 31. TEXT CLAMP UTILITY ─────────────────────────────────────────── */
+.text-clamp-1 { -webkit-line-clamp: 1 !important; }
+.text-clamp-2 { -webkit-line-clamp: 2 !important; }
+.text-clamp-3 { -webkit-line-clamp: 3 !important; }
+
+/* ── 32. RESPONSIVE TABLE CELL MIN-WIDTHS ───────────────────────────── */
+/* Prevent cells from becoming unreadably narrow */
+.table th:first-child,
+.table td:first-child { min-width: 140px; }
+.table th,
+.table td { min-width: 80px; }
+
+/* ── 33. AVATAR BLOCKS ──────────────────────────────────────────────── */
+.payroll-avatar-block .fw-semibold,
+.payroll-avatar-block .payroll-primary-text { 
+  color: var(--hrms-ink) !important;
+  font-weight: 600 !important;
+}
+.payroll-avatar-block .text-muted,
+.payroll-avatar-block .payroll-secondary-text {
+  color: var(--hrms-muted) !important;
+}
+
+/* ── 34. CHIP / TOGGLE ─────────────────────────────────────────────── */
+.payroll-chip-toggle {
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--hrms-transition);
+}
+.payroll-chip-toggle:hover {
+  border-color: rgba(242, 101, 34, 0.35);
+  background: rgba(242, 101, 34, 0.06);
+}
+
+/* ── 35. PERFORMANCE (GPU PROMOTION) ───────────────────────────────── */
+/* Only promote elements that actually animate to avoid memory waste */
+.payroll-hero,
+.payroll-stat-card,
+.employee-kpi-card,
+.employee-directory-card,
+.crm-pipeline-card,
+.modal-dialog {
+  transform: translateZ(0);
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 36. LOADING SKELETONS (avoids layout shift during data fetch) ─── */
+.hrms-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: hrms-shimmer 1.4s ease infinite;
+  border-radius: var(--hrms-radius-sm);
+}
+@keyframes hrms-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── 37. EMPTY STATES ──────────────────────────────────────────────── */
+.payroll-empty {
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--hrms-muted);
+}
+.payroll-empty h5 { color: var(--hrms-ink) !important; margin-bottom: 8px; }
+.payroll-empty p  { color: var(--hrms-muted) !important; max-width: 360px; margin: 0 auto 20px; }
+
+/* ── 38. TOOLTIP ────────────────────────────────────────────────────── */
+.tooltip-inner {
+  background: var(--hrms-ink);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  max-width: 220px;
+}
+
+/* ── 39. BREADCRUMB ─────────────────────────────────────────────────── */
+.breadcrumb-item,
+.breadcrumb-item a {
+  font-size: 13px;
+  color: var(--hrms-muted);
+}
+.breadcrumb-item.active { color: var(--hrms-ink); font-weight: 600; }
+
+/* ── 40. SCROLLBAR GLOBAL REFINEMENT ───────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d0d7e3 transparent;
+}
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c8d0dc;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 41. MODULE-SPECIFIC TEXT-OVERFLOW PATCHES ──────────────────────── */
+
+/* Org chart labels */
+.org-node-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  color: var(--hrms-ink) !important;
+}
+
+/* Recruitment kanban card titles */
+.crm-pipeline-card h6,
+.crm-pipeline-card p {
+  color: var(--hrms-ink) !important;
+  margin: 0 0 4px;
+}
+
+/* Leave grid cells */
+.leave-cell-label {
+  font-size: 11px;
+  color: var(--hrms-muted);
+  white-space: nowrap;
+}
+
+/* Attendance admin rows */
+.attendance-cell strong { color: var(--hrms-ink) !important; }
+.attendance-cell small  { color: var(--hrms-muted) !important; }
+
+/* Training & performance page headings */
+.training-type-card h5,
+.indicator-card h5 {
+  color: var(--hrms-ink) !important;
+}
+
+/* Payslip document internal headings */
+.payslip-document h4,
+.payslip-document h5,
+.payslip-document h6 { color: var(--hrms-ink) !important; }
+.payslip-document .text-muted { color: var(--hrms-muted) !important; }
+
+/* Final settlement, budget, accounting tables */
+.accounting-table td strong { color: var(--hrms-ink) !important; }
+.accounting-table td small  { color: var(--hrms-muted) !important; }
+
+/* Super-admin pages */
+.super-admin-page .card-title { color: var(--hrms-ink) !important; }
+.super-admin-page td { color: var(--hrms-ink-2) !important; }
+
+/* ── 42. MOBILE RESPONSIVE FINAL FIXES ─────────────────────────────── */
+@media (max-width: 575.98px) {
+  .payroll-title  { font-size: 24px; }
+  .payroll-hero .card-body { padding: 18px; }
+  .modal-body  { padding: 16px; }
+  .card-body   { padding: 14px; }
+  .table thead th { font-size: 10px; }
+  .btn { padding: 8px 14px; font-size: 13px; }
+}
+
+@media (max-width: 767.98px) {
+  .payroll-stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .payroll-toolbar   { grid-template-columns: 1fr !important; }
+  .payroll-modal-grid{ grid-template-columns: 1fr !important; }
+  .employee-form-layout { grid-template-columns: 1fr !important; }
+  .finance-detail-grid  { grid-template-columns: 1fr !important; }
+}

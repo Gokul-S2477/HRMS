@@ -52,10 +52,227 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [quickFilter, setQuickFilter] = useState("");
+  const [localIp, setLocalIp] = useState("");
+  const [localCoords, setLocalCoords] = useState(null);
+  const [coordsLoading, setCoordsLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json")
+      .then(res => res.json())
+      .then(data => setLocalIp(data.ip))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setCoordsLoading(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocalCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+          setCoordsLoading(false);
+        },
+        () => {
+          setCoordsLoading(false);
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      setCoordsLoading(false);
+    }
+  }, []);
+
+  const getCoordinates = () => {
+    return new Promise((resolve) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            console.warn("Geolocation error", error);
+            resolve(null);
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        resolve(null);
+      }
+    });
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  const [todayRecord, setTodayRecord] = useState(null);
+  const [punchWorkMode, setPunchWorkMode] = useState("Office");
+  const [elapsedTime, setElapsedTime] = useState("00:00:00");
+  const [breakTimer, setBreakTimer] = useState("00:00:00");
+
+  const loadTodayPunch = useCallback(async () => {
+    try {
+      const res = await API.get("/data/attendance-employee/");
+      const list = normalizeResourceRecords(res.data);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const found = list.find((r) => r.data?.date === todayStr);
+      setTodayRecord(found || null);
+    } catch (error) {
+      console.error("Failed to load today's punch status", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTodayPunch();
+  }, [loadTodayPunch]);
+
+  useEffect(() => {
+    if (!todayRecord || todayRecord.data?.check_out) {
+      setElapsedTime("00:00:00");
+      setBreakTimer("00:00:00");
+      return;
+    }
+    const checkInStr = todayRecord.data?.check_in;
+    if (!checkInStr) return;
+    
+    const [hours, minutes] = checkInStr.split(":").map(Number);
+    const checkInDate = new Date();
+    checkInDate.setHours(hours, minutes, 0, 0);
+
+    const updateTimer = () => {
+      const now = new Date();
+      let diffMs = now.getTime() - checkInDate.getTime();
+      if (diffMs < 0) diffMs = 0;
+      
+      let breakMs = 0;
+      const breaks = todayRecord.data?.breaks || [];
+      breaks.forEach((b) => {
+        if (b.start) {
+          const [sh, sm] = b.start.split(":").map(Number);
+          const sDate = new Date();
+          sDate.setHours(sh, sm, 0, 0);
+          
+          let eDate = new Date();
+          if (b.end) {
+            const [eh, em] = b.end.split(":").map(Number);
+            eDate.setHours(eh, em, 0, 0);
+          } else {
+            eDate = now;
+          }
+          let bDiff = eDate.getTime() - sDate.getTime();
+          if (bDiff > 0) breakMs += bDiff;
+        }
+      });
+
+      const netMs = diffMs - breakMs;
+      const totalSeconds = Math.max(0, Math.floor(netMs / 1000));
+      const h = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+      const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+      const s = String(totalSeconds % 60).padStart(2, "0");
+      setElapsedTime(`${h}:${m}:${s}`);
+
+      if (todayRecord.data?.on_break && breaks.length > 0) {
+        const lastBreak = breaks[breaks.length - 1];
+        if (lastBreak.start) {
+          const [sh, sm] = lastBreak.start.split(":").map(Number);
+          const sDate = new Date();
+          sDate.setHours(sh, sm, 0, 0);
+          const bDiffSec = Math.max(0, Math.floor((now.getTime() - sDate.getTime()) / 1000));
+          const bh = String(Math.floor(bDiffSec / 3600)).padStart(2, "0");
+          const bm = String(Math.floor((bDiffSec % 3600) / 60)).padStart(2, "0");
+          const bs = String(bDiffSec % 60).padStart(2, "0");
+          setBreakTimer(`${bh}:${bm}:${bs}`);
+        }
+      } else {
+        setBreakTimer("00:00:00");
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [todayRecord]);
+
+  const handlePunchIn = async () => {
+    setSaving(true);
+    try {
+      const coords = await getCoordinates();
+      const payload = {
+        date: new Date().toISOString().slice(0, 10),
+        work_mode: punchWorkMode,
+        latitude: coords?.latitude || null,
+        longitude: coords?.longitude || null,
+      };
+      await API.post("/data/attendance-employee/", { data: payload });
+      loadTodayPunch();
+      loadData();
+    } catch (error) {
+      console.error("Failed to clock in", error);
+      window.alert(error?.response?.data?.detail || "Unable to clock in.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBreakStart = async () => {
+    if (!todayRecord) return;
+    setSaving(true);
+    try {
+      const payload = {
+        action: "break_start",
+      };
+      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      loadTodayPunch();
+      loadData();
+    } catch (error) {
+      console.error("Failed to start break", error);
+      window.alert("Unable to start break.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBreakEnd = async () => {
+    if (!todayRecord) return;
+    setSaving(true);
+    try {
+      const payload = {
+        action: "break_end",
+      };
+      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      loadTodayPunch();
+      loadData();
+    } catch (error) {
+      console.error("Failed to end break", error);
+      window.alert("Unable to end break.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePunchOut = async () => {
+    if (!todayRecord) return;
+    if (!window.confirm("Are you sure you want to clock out for today?")) return;
+    setSaving(true);
+    try {
+      const payload = {
+        check_out: "force_server_time",
+      };
+      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      loadTodayPunch();
+      loadData();
+    } catch (error) {
+      console.error("Failed to clock out", error);
+      window.alert("Unable to clock out.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -193,7 +410,9 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
         const matchesShift = !shiftFilter || record.data?.shift === shiftFilter;
         const matchesWorkMode = !workModeFilter || record.data?.work_mode === workModeFilter;
         const matchesDate = isDateInRange(record.data?.date, dateFrom, dateTo);
-        const hoursWorked = calculateHours(record.data?.check_in, record.data?.check_out);
+        const hoursWorked = record.data?.work_hours !== undefined && record.data?.work_hours !== null
+          ? Number(record.data.work_hours)
+          : calculateHours(record.data?.check_in, record.data?.check_out);
         const matchesQuick =
           !quickFilter ||
           (quickFilter === "late" && record.data?.status === "Late") ||
@@ -259,7 +478,9 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
         : (
             filteredRecords.reduce(
               (sum, record) =>
-                sum + calculateHours(record.data?.check_in, record.data?.check_out),
+                sum + (record.data?.work_hours !== undefined && record.data?.work_hours !== null
+                  ? Number(record.data.work_hours)
+                  : calculateHours(record.data?.check_in, record.data?.check_out)),
               0
             ) / filteredRecords.length
           ).toFixed(1);
@@ -480,7 +701,9 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                         </tr>
                       ) : (
                         filteredRecords.map((record) => {
-                          const hours = calculateHours(record.data?.check_in, record.data?.check_out);
+                          const hours = record.data?.work_hours !== undefined && record.data?.work_hours !== null
+                            ? Number(record.data.work_hours)
+                            : calculateHours(record.data?.check_in, record.data?.check_out);
                           return (
                             <tr key={record.id}>
                               <td>
@@ -506,6 +729,17 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                                 <div className="payroll-secondary-text">
                                   {record.data?.check_in || "--"} - {record.data?.check_out || "--"}
                                 </div>
+                                {record.data?.ip_address && (
+                                  <div className="text-muted small mt-1" style={{ fontSize: "10.5px" }}>
+                                    <i className="ti ti-network me-1" />
+                                    IP: {record.data.ip_address} {record.data.ip_address_out ? ` / ${record.data.ip_address_out}` : ""}
+                                  </div>
+                                )}
+                                {record.data?.discrepancy && (
+                                  <div className="badge bg-danger-transparent text-danger mt-1 d-inline-flex align-items-center gap-1" title={Array.isArray(record.data.discrepancy_reasons) ? record.data.discrepancy_reasons.join(", ") : "Location or IP discrepancy"} style={{ fontSize: "10px", textTransform: "none" }}>
+                                    <i className="ti ti-alert-triangle" /> Discrepancy
+                                  </div>
+                                )}
                               </td>
                               <td>
                                 <span className={`payroll-badge ${toneClass(statusTone(record.data?.status))}`}>
@@ -522,6 +756,12 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                               </td>
                               <td>
                                 <div className="payroll-primary-text">{hours.toFixed(1)} hrs</div>
+                                {record.data?.break_hours > 0 && (
+                                  <div className="text-muted small" style={{ fontSize: "11px" }}>
+                                    <i className="ti ti-coffee me-1" />
+                                    Break: {Number(record.data.break_hours).toFixed(1)}h
+                                  </div>
+                                )}
                                 <div className="payroll-secondary-text">
                                   {record.data?.punctuality || "Auto-tracked"}
                                 </div>
@@ -558,6 +798,146 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
 
           <div className="col-xl-4">
             <div className="row g-4">
+              <div className="col-12">
+                <div className="card border-primary-subtle shadow-sm mb-0" style={{ borderRadius: "18px", overflow: "hidden" }}>
+                  <div className="card-header bg-primary-subtle py-3 border-0">
+                    <h5 className="mb-0 text-primary d-flex align-items-center gap-2" style={{ fontSize: "15px", fontWeight: "700" }}>
+                      <i className="ti ti-alarm-off" />
+                      Live Punch Card
+                    </h5>
+                  </div>
+                  <div className="card-body text-center p-4">
+                    {todayRecord ? (
+                      todayRecord.data?.check_out ? (
+                        <div>
+                          <div className="avatar avatar-lg bg-success-subtle text-success rounded-circle mb-3 mx-auto" style={{ width: "54px", height: "54px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <i className="ti ti-checkbox-check" style={{ fontSize: "24px" }} />
+                          </div>
+                          <h4 style={{ fontWeight: "800", color: "#1e293b" }}>Shift Completed</h4>
+                          <p className="text-muted small mb-0">
+                            Clocked In: <strong>{todayRecord.data?.check_in}</strong> • Clocked Out: <strong>{todayRecord.data?.check_out}</strong>
+                          </p>
+                          <div className="badge bg-success-subtle text-success mt-2 px-3 py-2" style={{ borderRadius: "8px" }}>
+                            Worked {todayRecord.data?.work_hours || 0} hrs
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="pulse-timer mb-2" style={{ fontFamily: "monospace", fontSize: "32px", fontWeight: "800", color: todayRecord.data?.on_break ? "#ea580c" : "#0284c7", letterSpacing: "1px" }}>
+                            {todayRecord.data?.on_break ? breakTimer : elapsedTime}
+                          </div>
+                          <p className="text-muted small mb-4">
+                            {todayRecord.data?.on_break ? (
+                              <span className="text-warning fw-bold d-block mb-1">
+                                <i className="ti ti-coffee me-1" /> Currently on Break
+                              </span>
+                            ) : (
+                              <span className="d-block mb-1">
+                                Active Shift • Clocked in at <strong>{todayRecord.data?.check_in}</strong>
+                              </span>
+                            )}
+                            {todayRecord.data?.ip_address && (
+                              <span className="d-block text-muted" style={{ fontSize: "11px" }}>
+                                <i className="ti ti-network me-1" /> IP Network: <strong>{todayRecord.data.ip_address}</strong>
+                              </span>
+                            )}
+                            {todayRecord.data?.latitude && (
+                              <span className="d-block text-muted" style={{ fontSize: "11px" }}>
+                                <i className="ti ti-map-pin me-1" /> GPS Checked: <strong>{Number(todayRecord.data.latitude).toFixed(4)}, {Number(todayRecord.data.longitude).toFixed(4)}</strong>
+                              </span>
+                            )}
+                            {todayRecord.data?.discrepancy && (
+                              <div className="alert alert-danger mt-3 py-2 px-3 mb-0 text-start" style={{ fontSize: "11.5px", borderRadius: "10px" }}>
+                                <i className="ti ti-alert-triangle me-1" /> <strong>Discrepancy Warning:</strong>
+                                <ul className="ps-3 mb-0 mt-1">
+                                  {todayRecord.data.discrepancy_reasons?.map((reason, idx) => (
+                                    <li key={idx}>{reason}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </p>
+                          <div className="d-flex gap-2 mb-3">
+                            {todayRecord.data?.on_break ? (
+                              <button
+                                type="button"
+                                className="btn btn-warning w-100 py-2"
+                                style={{ borderRadius: "12px", fontWeight: "700" }}
+                                onClick={handleBreakEnd}
+                                disabled={saving}
+                              >
+                                <i className="ti ti-player-play me-2" />
+                                End Break
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-outline-warning w-100 py-2"
+                                style={{ borderRadius: "12px", fontWeight: "700" }}
+                                onClick={handleBreakStart}
+                                disabled={saving}
+                              >
+                                <i className="ti ti-coffee me-2" />
+                                Start Break
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-danger w-100 py-2.5"
+                            style={{ borderRadius: "12px", fontWeight: "700" }}
+                            onClick={handlePunchOut}
+                            disabled={saving || todayRecord.data?.on_break}
+                          >
+                            <i className="ti ti-logout me-2" />
+                            Clock Out
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <div>
+                        <div className="text-muted small mb-2">
+                          You are not clocked in yet. Select work mode and punch in to start your shift.
+                        </div>
+                        <div className="small text-muted mb-3">
+                          {coordsLoading ? (
+                            <span><span className="spinner-border spinner-border-sm me-1" role="status" /> Detecting location...</span>
+                          ) : localCoords ? (
+                            <span className="text-success fw-semibold"><i className="ti ti-map-pin me-1" /> GPS Active ({localCoords.latitude.toFixed(4)}, {localCoords.longitude.toFixed(4)})</span>
+                          ) : (
+                            <span className="text-warning fw-semibold"><i className="ti ti-alert-triangle me-1" /> GPS Offline (Required for Office mode)</span>
+                          )}
+                          {localIp && (
+                            <div className="mt-1"><i className="ti ti-network me-1" /> Net IP: {localIp}</div>
+                          )}
+                        </div>
+                        <div className="mb-3">
+                          <select
+                            className="form-select mx-auto"
+                            style={{ maxWidth: "200px", borderRadius: "10px" }}
+                            value={punchWorkMode}
+                            onChange={(e) => setPunchWorkMode(e.target.value)}
+                          >
+                            <option value="Office">Office</option>
+                            <option value="Remote">Remote</option>
+                            <option value="Hybrid">Hybrid</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-primary w-100 py-2.5"
+                          style={{ borderRadius: "12px", fontWeight: "700" }}
+                          onClick={handlePunchIn}
+                          disabled={saving}
+                        >
+                          <i className="ti ti-fingerprint me-2" />
+                          Punch In
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="col-12">
                 <HrmSideList
                   title="Latest Activity"

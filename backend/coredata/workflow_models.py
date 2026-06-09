@@ -1244,3 +1244,110 @@ class ReminderEvent(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ExpenseClaim(models.Model):
+    STATUS_DRAFT = "Draft"
+    STATUS_PENDING = "Pending"
+    STATUS_APPROVED = "Approved"
+    STATUS_REJECTED = "Rejected"
+    STATUS_CHOICES = (
+        (STATUS_DRAFT, "Draft"),
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    )
+
+    CATEGORY_TRAVEL = "Travel"
+    CATEGORY_FOOD = "Food"
+    CATEGORY_CLIENT = "Client"
+    CATEGORY_SOFTWARE = "Software"
+    CATEGORY_OTHER = "Other"
+    CATEGORY_CHOICES = (
+        (CATEGORY_TRAVEL, "Travel"),
+        (CATEGORY_FOOD, "Food"),
+        (CATEGORY_CLIENT, "Client"),
+        (CATEGORY_SOFTWARE, "Software"),
+        (CATEGORY_OTHER, "Other"),
+    )
+
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="expense_claims",
+    )
+    title = models.CharField(max_length=150)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    claim_date = models.DateField(db_index=True)
+    receipt_file = models.FileField(upload_to="receipts/", null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    reviewer_note = models.TextField(blank=True)
+    processed_in_payroll = models.ForeignKey(
+        "payroll.EmployeePayroll",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="expense_claims",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-claim_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.title} ({self.amount})"
+
+
+class DocumentEsign(models.Model):
+    title = models.CharField(max_length=160)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to="esign_documents/")
+    distribution_type = models.CharField(max_length=20, default="all")  # "all", "department", "role"
+    target_department = models.ForeignKey(
+        "employees.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    target_role = models.CharField(max_length=60, blank=True, null=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class DocumentSignature(models.Model):
+    document = models.ForeignKey(
+        DocumentEsign,
+        on_delete=models.CASCADE,
+        related_name="signatures",
+    )
+    employee = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.CASCADE,
+        related_name="esign_signatures",
+    )
+    status = models.CharField(max_length=20, default="pending")  # "pending", "signed"
+    signed_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.CharField(max_length=45, blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.document.title} ({self.status})"

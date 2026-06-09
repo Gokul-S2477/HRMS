@@ -27,6 +27,7 @@ from coredata.models import (
     Resource,
     ShiftDefinition,
     TimesheetEntry,
+    ExpenseClaim,
 )
 from coredata.workflow_services import ensure_onboarding_tasks, sync_generic_resource
 from employees.models import Department, Designation, Employee, Policy
@@ -458,6 +459,18 @@ class Command(BaseCommand):
         )
 
         seed_resources(
+            "attendance-settings",
+            [
+                {
+                    "latitude": 12.9716,
+                    "longitude": 77.5946,
+                    "radius": 5000,
+                    "ip_ranges": ["127.0.0.1", "192.168.1.", "10.0.0."],
+                }
+            ],
+        )
+
+        seed_resources(
             "leave-admin",
             [
                 {
@@ -872,6 +885,36 @@ class Command(BaseCommand):
                     ],
                 },
             ],
+        )
+
+        seed_resources(
+            "projects",
+            [
+                {
+                    "name": "Website Revamp",
+                    "code": "PROJ-001",
+                    "status": "Active",
+                    "description": "Redesign corporate website",
+                },
+                {
+                    "name": "HR Portal Setup",
+                    "code": "PROJ-002",
+                    "status": "Active",
+                    "description": "Configure and deploy new HR system",
+                },
+                {
+                    "name": "Hospital Dashboard",
+                    "code": "PROJ-003",
+                    "status": "Active",
+                    "description": "Develop hospital management dashboard",
+                },
+                {
+                    "name": "People Ops Revamp",
+                    "code": "PROJ-004",
+                    "status": "Active",
+                    "description": "Improve internal people operations workflow",
+                },
+            ]
         )
 
         seed_resources(
@@ -1505,6 +1548,49 @@ class Command(BaseCommand):
         )
         if created:
             created_summary.append("overtime:EMP-001")
+
+        # --- expense claims ---
+        _, created = ExpenseClaim.objects.get_or_create(
+            employee=emp2,
+            title="Client Lunch at Spice Garden",
+            defaults={
+                "category": ExpenseClaim.CATEGORY_FOOD,
+                "amount": Decimal("120.00"),
+                "claim_date": today.replace(day=max(1, today.day - 5)),
+                "status": ExpenseClaim.STATUS_APPROVED,
+                "reviewer_note": "Approved by HR Manager.",
+            },
+        )
+        if created:
+            created_summary.append("expense_claim:Client Lunch")
+
+        _, created = ExpenseClaim.objects.get_or_create(
+            employee=emp2,
+            title="AWS SaaS Monthly Subscription",
+            defaults={
+                "category": ExpenseClaim.CATEGORY_SOFTWARE,
+                "amount": Decimal("350.00"),
+                "claim_date": today,
+                "status": ExpenseClaim.STATUS_PENDING,
+                "reviewer_note": "",
+            },
+        )
+        if created:
+            created_summary.append("expense_claim:AWS SaaS")
+
+        _, created = ExpenseClaim.objects.get_or_create(
+            employee=emp1,
+            title="Travel Taxi for Office Commute",
+            defaults={
+                "category": ExpenseClaim.CATEGORY_TRAVEL,
+                "amount": Decimal("45.50"),
+                "claim_date": today.replace(day=max(1, today.day - 2)),
+                "status": ExpenseClaim.STATUS_DRAFT,
+                "reviewer_note": "",
+            },
+        )
+        if created:
+            created_summary.append("expense_claim:Taxi Commute")
 
         laptop_category, created = AssetCategory.objects.get_or_create(
             name="Laptops",

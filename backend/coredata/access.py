@@ -45,8 +45,8 @@ RESOURCE_RULES = {
     },
     "attendance-employee": {
         "read": SUPER_AND_HR | {ROLE_EMPLOYEE},
-        "create": SUPER_AND_HR,
-        "update": SUPER_AND_HR,
+        "create": SUPER_AND_HR | {ROLE_EMPLOYEE},
+        "update": SUPER_AND_HR | {ROLE_EMPLOYEE},
         "delete": SUPER_AND_HR,
         "employee_self_scope": True,
     },
@@ -193,7 +193,13 @@ RESOURCE_RULES = {
         "delete": SUPER_AND_HR,
     },
     "crm-deals": {
-        "read": SUPER_AND_HR | {ROLE_STAKEHOLDER},
+        "read": PEOPLE_ROLES,
+        "create": SUPER_AND_HR,
+        "update": SUPER_AND_HR,
+        "delete": SUPER_AND_HR,
+    },
+    "projects": {
+        "read": PEOPLE_ROLES,
         "create": SUPER_AND_HR,
         "update": SUPER_AND_HR,
         "delete": SUPER_AND_HR,
@@ -209,6 +215,27 @@ RESOURCE_RULES = {
         "create": SUPER_AND_HR | {ROLE_STAKEHOLDER},
         "update": SUPER_AND_HR | {ROLE_STAKEHOLDER},
         "delete": SUPER_AND_HR,
+    },
+    "shift-roster": {
+        "read": PEOPLE_ROLES,
+        "create": SUPER_AND_HR,
+        "update": SUPER_AND_HR,
+        "delete": SUPER_AND_HR,
+        "employee_self_scope": True,
+    },
+    "expense-claims": {
+        "read": PEOPLE_ROLES,
+        "create": PEOPLE_ROLES,
+        "update": SUPER_AND_HR | {ROLE_EMPLOYEE},
+        "delete": SUPER_AND_HR,
+        "employee_self_scope": True,
+    },
+    "profile-update-requests": {
+        "read": SUPER_AND_HR | {ROLE_EMPLOYEE},
+        "create": SUPER_AND_HR | {ROLE_EMPLOYEE},
+        "update": SUPER_AND_HR,
+        "delete": SUPER_AND_HR,
+        "employee_self_scope": True,
     },
 }
 

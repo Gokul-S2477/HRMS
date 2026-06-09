@@ -132,6 +132,8 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<LeaveRecord | null>(null);
   const [form, setForm] = useState<LeaveForm>(emptyForm);
+  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"requests" | "ledger">("requests");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -139,6 +141,10 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
       const leaveRes = await API.get(resource);
       const list = Array.isArray(leaveRes.data) ? leaveRes.data : leaveRes.data?.results || [];
       setRecords(list);
+
+      const ledgerRes = await API.get("/leave-ledger/");
+      const ledgerList = Array.isArray(ledgerRes.data) ? ledgerRes.data : ledgerRes.data?.results || [];
+      setLedgerEntries(ledgerList);
 
       if (canReview) {
         const employeeDirectory = (await fetchEmployeeDirectory()) as EmployeeOption[];
@@ -192,6 +198,27 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
     if (!form.from_date || !form.to_date) {
       window.alert("Leave dates are required.");
       return;
+    }
+
+    const requestedDays = leaveDays(form.from_date, form.to_date);
+    if (requestedDays <= 0) {
+      window.alert("Please select a valid date range.");
+      return;
+    }
+
+    if (isEmployeeMode) {
+      const balance = leaveBalances.find((item) => {
+        const bt = (item.leave_type || "").toLowerCase();
+        const ft = (form.leave_type || "").toLowerCase();
+        return bt === ft || bt.includes(ft) || ft.includes(bt);
+      });
+      const available = balance ? Number(balance.available || 0) : 0;
+      if (requestedDays > available) {
+        window.alert(
+          `Unable to submit request. You requested ${requestedDays} day(s), but your available ${form.leave_type} balance is only ${available} day(s).`
+        );
+        return;
+      }
     }
 
     const employee = employees.find((item) => String(item.id) === String(form.employee_id));
@@ -380,20 +407,41 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
         <div className="row g-4">
           <div className="col-xl-8">
             <div className="card payroll-panel payroll-table-card">
-              <div className="payroll-table-header">
-                <div>
-                  <h5>{canReview ? "Leave Approval Register" : "My Leave Requests"}</h5>
-                  <div className="payroll-table-subtitle">
-                    {canReview
-                      ? "Review requests, mark whether they were informed before or after leave, and keep reviewer visibility attached to each case."
-                      : "Track each leave request and see who approved it and whether it was treated as pre-informed or post-informed."}
+              <div className="payroll-table-header flex-column align-items-stretch">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h5>{canReview ? "Leave Approval Register" : "My Leave Requests"}</h5>
+                    <div className="payroll-table-subtitle">
+                      {canReview
+                        ? "Review requests, mark whether they were informed before or after leave, and keep reviewer visibility attached to each case."
+                        : "Track each leave request and see who approved it and whether it was treated as pre-informed or post-informed."}
+                    </div>
+                  </div>
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${activeTab === "requests" ? "btn-primary" : "btn-light"}`}
+                      style={{ borderRadius: "8px", fontWeight: "600" }}
+                      onClick={() => setActiveTab("requests")}
+                    >
+                      Leave Requests
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${activeTab === "ledger" ? "btn-primary" : "btn-light"}`}
+                      style={{ borderRadius: "8px", fontWeight: "600" }}
+                      onClick={() => setActiveTab("ledger")}
+                    >
+                      Ledger History
+                    </button>
                   </div>
                 </div>
+
                 <div className="payroll-table-controls">
                   <input
                     className="form-control"
                     style={{ minWidth: 220 }}
-                    placeholder="Smart search employee, reason, leave type"
+                    placeholder={activeTab === "requests" ? "Smart search employee, reason, leave type" : "Search ledger entries..."}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                   />
@@ -405,38 +453,44 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
                     >
                       <option value="">All employees</option>
                       {employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
+                        <option key={employee.id} value={String(employee.id)}>
                           {employee.name}
                         </option>
                       ))}
                     </select>
                   ) : null}
-                  <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                    <option value="">All statuses</option>
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                  <select className="form-select" value={leaveTypeFilter} onChange={(event) => setLeaveTypeFilter(event.target.value)}>
-                    <option value="">All leave types</option>
-                    {LEAVE_TYPE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <select className="form-select" value={noticeFilter} onChange={(event) => setNoticeFilter(event.target.value)}>
-                    <option value="">All notice types</option>
-                    {NOTICE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <input type="date" className="form-control" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-                  <input type="date" className="form-control" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+
+                  {activeTab === "requests" && (
+                    <>
+                      <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                        <option value="">All statuses</option>
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <select className="form-select" value={leaveTypeFilter} onChange={(event) => setLeaveTypeFilter(event.target.value)}>
+                        <option value="">All leave types</option>
+                        {LEAVE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                      <select className="form-select" value={noticeFilter} onChange={(event) => setNoticeFilter(event.target.value)}>
+                        <option value="">All notice types</option>
+                        {NOTICE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                      <input type="date" className="form-control" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+                      <input type="date" className="form-control" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+                    </>
+                  )}
+
                   <div className="payroll-filter-actions">
                     <span className="payroll-filter-meta">
                       Filters <strong>{appliedFilters}</strong>
@@ -459,100 +513,196 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="payroll-filter-actions mt-3">
-                  {[
-                    { key: "pending", label: "Pending" },
-                    { key: "long-leave", label: "3+ days" },
-                    { key: "pre-informed", label: "Pre-informed" },
-                    { key: "post-informed", label: "Post-informed" },
-                    { key: "starting-soon", label: "Starting soon" },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={`payroll-chip-toggle ${quickFilter === item.key ? "active" : ""}`}
-                      onClick={() => setQuickFilter((current) => (current === item.key ? "" : item.key))}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+
+                {activeTab === "requests" && (
+                  <div className="payroll-filter-actions mt-3">
+                    {[
+                      { key: "pending", label: "Pending" },
+                      { key: "long-leave", label: "3+ days" },
+                      { key: "pre-informed", label: "Pre-informed" },
+                      { key: "post-informed", label: "Post-informed" },
+                      { key: "starting-soon", label: "Starting soon" },
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={`payroll-chip-toggle ${quickFilter === item.key ? "active" : ""}`}
+                        onClick={() => setQuickFilter((current) => (current === item.key ? "" : item.key))}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
               <div className="payroll-table-shell">
-                <div className="table-responsive">
-                  <table className="table align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th>Employee</th>
-                        <th>Leave Type</th>
-                        <th>Duration</th>
-                        <th>Days</th>
-                        <th>Status</th>
-                        <th>Notice Type</th>
-                        <th>Reviewed By</th>
-                        <th>Reason</th>
-                        <th className="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loading ? (
+                {activeTab === "requests" ? (
+                  <div className="table-responsive">
+                    <table className="table align-middle mb-0">
+                      <thead>
                         <tr>
-                          <td colSpan={9} className="text-center py-5">
-                            Loading leave requests...
-                          </td>
+                          <th>Employee</th>
+                          <th>Leave Type</th>
+                          <th>Duration</th>
+                          <th>Days</th>
+                          <th>Status</th>
+                          <th>Notice Type</th>
+                          <th>Reviewed By</th>
+                          <th>Reason</th>
+                          <th className="text-end">Actions</th>
                         </tr>
-                      ) : filteredRecords.length === 0 ? (
-                        <tr>
-                          <td colSpan={9}>
-                            <HrmEmptyState
-                              icon="ti ti-calendar-off"
-                              title="No leave requests in this view"
-                              description="Try clearing filters or ask an employee to submit a leave request to start the workflow."
-                            />
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredRecords.map((record) => (
-                          <tr key={record.id}>
-                            <td>
-                              <div className="payroll-primary-text">{record.data?.employee_name || "-"}</div>
-                              <div className="payroll-secondary-text">Employee ID {record.data?.employee_id || "-"}</div>
-                            </td>
-                            <td>{record.data?.leave_type || "-"}</td>
-                            <td>
-                              <div className="payroll-primary-text">{formatDisplayDate(record.data?.from_date)}</div>
-                              <div className="payroll-secondary-text">to {formatDisplayDate(record.data?.to_date)}</div>
-                            </td>
-                            <td>{leaveDays(record.data?.from_date, record.data?.to_date) || "-"}</td>
-                            <td>
-                              <span className={`payroll-badge ${toneClass(statusTone(record.data?.status))}`}>
-                                {record.data?.status || "Pending"}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="payroll-primary-text">{record.data?.notice_timing || "Awaiting review"}</div>
-                              <div className="payroll-secondary-text">{record.data?.approval_context || "No reviewer note yet"}</div>
-                            </td>
-                            <td>
-                              <div className="payroll-primary-text">{record.data?.approved_by || record.data?.reviewed_by || "-"}</div>
-                              <div className="payroll-secondary-text">{record.data?.approved_role || record.data?.reviewed_role || "-"}</div>
-                            </td>
-                            <td>{record.data?.reason || "-"}</td>
-                            <td className="text-end">
-                              {canReview ? (
-                                <button type="button" className="btn btn-sm btn-light" onClick={() => openEdit(record)}>
-                                  <i className="ti ti-checkup-list me-1" /> Review
-                                </button>
-                              ) : (
-                                <span className="text-muted small">Request only</span>
-                              )}
+                      </thead>
+                      <tbody>
+                        {loading ? (
+                          <tr>
+                            <td colSpan={9} className="text-center py-5">
+                              Loading leave requests...
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        ) : filteredRecords.length === 0 ? (
+                          <tr>
+                            <td colSpan={9}>
+                              <HrmEmptyState
+                                icon="ti ti-calendar-off"
+                                title="No leave requests in this view"
+                                description="Try clearing filters or ask an employee to submit a leave request to start the workflow."
+                              />
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredRecords.map((record) => (
+                            <tr key={record.id}>
+                              <td>
+                                <div className="payroll-primary-text">{record.data?.employee_name || "-"}</div>
+                                <div className="payroll-secondary-text">Employee ID {record.data?.employee_id || "-"}</div>
+                              </td>
+                              <td>{record.data?.leave_type || "-"}</td>
+                              <td>
+                                <div className="payroll-primary-text">{formatDisplayDate(record.data?.from_date)}</div>
+                                <div className="payroll-secondary-text">to {formatDisplayDate(record.data?.to_date)}</div>
+                              </td>
+                              <td>{leaveDays(record.data?.from_date, record.data?.to_date) || "-"}</td>
+                              <td>
+                                <span className={`payroll-badge ${toneClass(statusTone(record.data?.status))}`}>
+                                  {record.data?.status || "Pending"}
+                                </span>
+                              </td>
+                              <td>
+                                <div className="payroll-primary-text">{record.data?.notice_timing || "Awaiting review"}</div>
+                                <div className="payroll-secondary-text">{record.data?.approval_context || "No reviewer note yet"}</div>
+                              </td>
+                              <td>
+                                <div className="payroll-primary-text">{record.data?.approved_by || record.data?.reviewed_by || "-"}</div>
+                                <div className="payroll-secondary-text">{record.data?.approved_role || record.data?.reviewed_role || "-"}</div>
+                              </td>
+                              <td>{record.data?.reason || "-"}</td>
+                              <td className="text-end">
+                                {canReview ? (
+                                  <button type="button" className="btn btn-sm btn-light" onClick={() => openEdit(record)}>
+                                    <i className="ti ti-checkup-list me-1" /> Review
+                                  </button>
+                                ) : (
+                                  <span className="text-muted small">Request only</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          {canReview && <th>Employee</th>}
+                          <th>Leave Type</th>
+                          <th>Transaction</th>
+                          <th className="text-center">Adjustment (Days)</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loading ? (
+                          <tr>
+                            <td colSpan={canReview ? 6 : 5} className="text-center py-5">
+                              Loading leave ledger...
+                            </td>
+                          </tr>
+                        ) : ledgerEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={canReview ? 6 : 5}>
+                              <HrmEmptyState
+                                icon="ti ti-history"
+                                title="No ledger entries found"
+                                description="Adjustments, approvals, and monthly accruals will be logged here."
+                              />
+                            </td>
+                          </tr>
+                        ) : (
+                          ledgerEntries
+                            .filter((entry) => {
+                              const matchesSearch = smartSearchMatch(entry, search) ||
+                                String(entry.employee_name || entry.employee?.first_name || "").toLowerCase().includes(search.toLowerCase());
+                              const matchesEmployee = !employeeFilter || String(entry.employee?.id || entry.employee || "") === employeeFilter;
+                              return matchesSearch && matchesEmployee;
+                            })
+                            .map((entry) => {
+                              const isDebit = ["approved_debit", "pending_hold"].includes(entry.entry_type);
+                              const daysNum = parseFloat(entry.days);
+                              
+                              let txLabel = entry.entry_type;
+                              let txTone = "info";
+                              if (entry.entry_type === "allocation") {
+                                txLabel = "Accrual Credit";
+                                txTone = "success";
+                              } else if (entry.entry_type === "carry_forward") {
+                                txLabel = "Carry Forward";
+                                txTone = "success";
+                              } else if (entry.entry_type === "pending_hold") {
+                                txLabel = "Pending Hold";
+                                txTone = "warning";
+                              } else if (entry.entry_type === "approved_debit") {
+                                txLabel = "Approved Debit";
+                                txTone = "danger";
+                              } else if (entry.entry_type === "adjustment") {
+                                txLabel = "Adjustment";
+                                txTone = daysNum >= 0 ? "success" : "danger";
+                              }
+
+                              return (
+                                <tr key={entry.id}>
+                                  <td>{formatDisplayDate(entry.created_at)}</td>
+                                  {canReview && (
+                                    <td>
+                                      <div className="fw-semibold">
+                                        {entry.employee?.first_name || entry.employee_name || "Employee"} {entry.employee?.last_name || ""}
+                                      </div>
+                                      <div className="text-muted small">Code: {entry.employee?.emp_code || "N/A"}</div>
+                                    </td>
+                                  )}
+                                  <td>{entry.leave_type}</td>
+                                  <td>
+                                    <span className={`payroll-badge ${toneClass(txTone)}`}>
+                                      {txLabel}
+                                    </span>
+                                  </td>
+                                  <td className={`text-center fw-bold ${isDebit || (entry.entry_type === "adjustment" && daysNum < 0) ? "text-danger" : "text-success"}`}>
+                                    {isDebit || (entry.entry_type === "adjustment" && daysNum < 0) ? "-" : "+"}
+                                    {Math.abs(daysNum).toFixed(1)}
+                                  </td>
+                                  <td className="text-muted small">{entry.description || "System log"}</td>
+                                </tr>
+                              );
+                            })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -2,8 +2,10 @@ from datetime import datetime
 
 from django.db.models import Count, Q
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from users.permissions import is_employee, is_hr_or_above
 
@@ -62,6 +64,40 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         super().initial(request, *args, **kwargs)
         if request.method not in {"GET", "HEAD", "OPTIONS"} and not is_hr_or_above(request.user):
             self.permission_denied(request, message="Only HR and super admins can change employees.")
+
+    @action(detail=False, methods=["get"], url_path="tree", permission_classes=[IsAuthenticated])
+    def tree(self, request):
+        employees = Employee.objects.select_related("department", "designation").filter(is_active=True)
+        
+        all_nodes = {}
+        for emp in employees:
+            node = {
+                "id": emp.id,
+                "first_name": emp.first_name,
+                "last_name": emp.last_name,
+                "full_name": f"{emp.first_name} {emp.last_name or ''}".strip(),
+                "email": emp.email,
+                "phone": emp.phone or "",
+                "department": emp.department.name if emp.department else None,
+                "designation": emp.designation.title if emp.designation else None,
+                "emp_code": emp.emp_code,
+                "photo": emp.photo.url if emp.photo else None,
+                "joining_date": emp.joining_date.isoformat() if emp.joining_date else None,
+                "reporting_to_id": emp.reporting_to_id,
+                "children": []
+            }
+            all_nodes[emp.id] = node
+            
+        roots = []
+        for emp in employees:
+            node = all_nodes[emp.id]
+            parent_id = emp.reporting_to_id
+            if parent_id and parent_id in all_nodes:
+                all_nodes[parent_id]["children"].append(node)
+            else:
+                roots.append(node)
+                
+        return Response(roots)
 
 
 class PolicyViewSet(viewsets.ModelViewSet):

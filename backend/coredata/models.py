@@ -48,4 +48,7 @@ from .workflow_models import (  # noqa: E402,F401
     RecruitmentReferral,
     ShiftDefinition,
     TimesheetEntry,
+    ExpenseClaim,
+    DocumentEsign,
+    DocumentSignature,
 )

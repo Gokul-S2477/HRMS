@@ -432,6 +432,11 @@ export const HorizontalSidebarData = [
                     base: 'employees',
                     base2: 'policy',
                   },
+                  {
+                    menuValue: 'Org Chart',
+                    route: routes.orgChart,
+                    base: 'org-chart',
+                  },
                 ],
               },
               {
@@ -567,6 +572,23 @@ export const HorizontalSidebarData = [
                 route: routes.termination,
                 base: 'termination',
                 customSubmenuTwo: false,
+              },
+              {
+                menuValue: 'Reimbursements',
+                base: 'reimbursements',
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Expense Claims',
+                    route: routes.expenseClaims,
+                    base: 'expenses',
+                  },
+                  {
+                    menuValue: 'Claims Approval',
+                    route: routes.expenseApprovals,
+                    base: 'expense-approvals',
+                  },
+                ],
               },
             ],
           },
@@ -710,6 +732,74 @@ export const HorizontalSidebarData = [
                     menuValue: 'Asset Categories',
                     route: '/assets/asset-categories',
                     base: 'asset-categories',
+                  },
+                ],
+              },
+              {
+                menuValue: 'Documents',
+                base: 'documents',
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Employee Documents',
+                    route: routes.employeeDocuments,
+                    base: 'employee-documents',
+                  },
+                  {
+                    menuValue: 'Document Categories',
+                    route: routes.documentCategories,
+                    base: 'document-categories',
+                  },
+                ],
+              },
+              {
+                menuValue: 'Onboarding',
+                base: 'onboarding',
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Onboarding Desk',
+                    route: routes.onboardingDesk,
+                    base: 'onboarding-desk',
+                  },
+                  {
+                    menuValue: 'Templates',
+                    route: routes.onboardingTemplates,
+                    base: 'onboarding-templates',
+                  },
+                ],
+              },
+              {
+                menuValue: 'E-Sign',
+                base: 'esign',
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'E-Sign Desk',
+                    route: routes.eSignDesk,
+                    base: 'esign-desk',
+                  },
+                  {
+                    menuValue: 'My Signatures',
+                    route: routes.eSignWorkspace,
+                    base: 'esign-workspace',
+                  },
+                ],
+              },
+              {
+                menuValue: 'Approvals',
+                base: 'approvals',
+                customSubmenuTwo: true,
+                subMenusTwo: [
+                  {
+                    menuValue: 'Approval Inbox',
+                    route: routes.approvalInbox,
+                    base: 'approval-inbox',
+                  },
+                  {
+                    menuValue: 'Audit Trail',
+                    route: routes.auditTrail,
+                    base: 'audit-trail',
                   },
                 ],
               },

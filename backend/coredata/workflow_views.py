@@ -47,6 +47,9 @@ from .models import (
     Resource,
     ShiftDefinition,
     TimesheetEntry,
+    ExpenseClaim,
+    DocumentEsign,
+    DocumentSignature,
 )
 from .workflow_serializers import (
     ApplicantAccountSerializer,
@@ -74,6 +77,9 @@ from .workflow_serializers import (
     RecruitmentReferralSerializer,
     ShiftDefinitionSerializer,
     TimesheetEntrySerializer,
+    ExpenseClaimSerializer,
+    DocumentEsignSerializer,
+    DocumentSignatureSerializer,
 )
 from .workflow_services import (
     create_audit_log,
@@ -1407,6 +1413,24 @@ class ApprovalInboxView(APIView):
                 "metadata": payload,
             })
 
+        # Profile Update Requests
+        profile_qs = Resource.objects.filter(resource_type="profile-update-requests", data__status="Pending")
+        for resource in profile_qs.order_by("-updated_at")[:60]:
+            payload = dict(resource.data or {})
+            section_label = str(payload.get("section") or "profile").replace("_", " ").title()
+            items.append({
+                "scope": "profile_update",
+                "id": str(resource.id),
+                "title": f"Profile Update: {section_label}",
+                "status": payload.get("status") or "Pending",
+                "employee_name": payload.get("employee_name") or "Employee",
+                "summary": f"{payload.get('employee_name') or 'Employee'} requested update to {section_label.lower()} details",
+                "submitted_at": resource.updated_at,
+                "requested_by": payload.get("requested_by") or payload.get("employee_name") or "Employee",
+                "module_path": f"/employee-details/{payload.get('employee_id')}",
+                "metadata": payload,
+            })
+
         if is_hr_or_above(request.user):
             for entry in TimesheetEntry.objects.filter(status=TimesheetEntry.STATUS_SUBMITTED).select_related("employee").order_by("-updated_at")[:60]:
                 items.append({
@@ -1498,7 +1522,7 @@ class ApprovalInboxView(APIView):
         item_id = str(request.data.get("id") or "").strip()
         decision = str(request.data.get("decision") or "").strip().lower()
         note = str(request.data.get("note") or "").strip()
-        if scope not in {"leave", "timesheet", "overtime", "payroll", "final_settlement", "offboarding"}:
+        if scope not in {"leave", "timesheet", "overtime", "payroll", "final_settlement", "offboarding", "profile_update"}:
             return Response({"detail": "Invalid approval scope."}, status=status.HTTP_400_BAD_REQUEST)
         if decision not in {"approve", "reject", "return"}:
             return Response({"detail": "Select approve, reject, or return."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1506,7 +1530,49 @@ class ApprovalInboxView(APIView):
         actor_name = request.user.get_display_name()
         actor_role = resolve_role(request.user) or getattr(request.user, "role", "hr")
 
-        if scope == "leave":
+        if scope == "profile_update":
+            resource = Resource.objects.filter(resource_type="profile-update-requests", id=item_id).first()
+            if not resource:
+                return Response({"detail": "Profile update request not found."}, status=status.HTTP_404_NOT_FOUND)
+            payload = dict(resource.data or {})
+            new_status = "Approved" if decision == "approve" else "Rejected" if decision == "reject" else "Pending"
+            payload["status"] = new_status
+            payload["comments"] = note
+            payload["reviewed_by"] = actor_name
+            payload["reviewed_role"] = actor_role
+            payload["reviewed_at"] = timezone.now().isoformat()
+            if decision == "approve":
+                payload["approved_by"] = actor_name
+                payload["approved_role"] = actor_role
+                payload["approved_at"] = timezone.now().isoformat()
+                
+                # Apply proposed changes to the Employee model record
+                emp_id = payload.get("employee_id")
+                proposed_changes = payload.get("proposed_changes") or {}
+                if emp_id and proposed_changes:
+                    from employees.models import Employee
+                    try:
+                        employee_instance = Employee.objects.get(pk=emp_id)
+                        for field, value in proposed_changes.items():
+                            if hasattr(employee_instance, field):
+                                if field in {"personal_info", "bank_info", "family_info"}:
+                                    current_dict = getattr(employee_instance, field) or {}
+                                    if isinstance(current_dict, dict) and isinstance(value, dict):
+                                        merged_dict = {**current_dict, **value}
+                                        setattr(employee_instance, field, merged_dict)
+                                    else:
+                                        setattr(employee_instance, field, value)
+                                elif field in {"education", "experience", "projects", "assets"}:
+                                    setattr(employee_instance, field, value)
+                                else:
+                                    setattr(employee_instance, field, value)
+                        employee_instance.save()
+                    except Employee.DoesNotExist:
+                        pass
+            resource.data = payload
+            resource.save(update_fields=["data", "updated_at"])
+            sync_generic_resource(resource, actor=request.user)
+        elif scope == "leave":
             resource = Resource.objects.filter(resource_type="leave-employee", id=item_id).first()
             if not resource:
                 return Response({"detail": "Leave request not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -1595,6 +1661,67 @@ class ApprovalInboxView(APIView):
         return Response({"status": "ok"})
 
 
+class ExpenseClaimViewSet(HROrEmployeeScopedViewSet):
+    serializer_class = ExpenseClaimSerializer
+    queryset = ExpenseClaim.objects.select_related(
+        "employee",
+        "processed_in_payroll",
+    ).all()
+    employee_can_write = True
+    employee_field = "employee_id"
+
+    def perform_create(self, serializer):
+        employee = serializer.validated_data.get("employee")
+        if is_employee(self.request.user):
+            employee = getattr(self.request.user, "employee_profile", None)
+            if not employee:
+                raise serializers.ValidationError("Employee login is not linked to an employee profile.")
+        
+        record = serializer.save(employee=employee)
+        
+        # If created by employee, force status to Pending or Draft
+        if is_employee(self.request.user):
+            if record.status not in {ExpenseClaim.STATUS_DRAFT, ExpenseClaim.STATUS_PENDING}:
+                record.status = ExpenseClaim.STATUS_PENDING
+                record.save()
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        # Employees cannot approve/reject or modify reviewer note
+        if is_employee(self.request.user):
+            if instance.status == ExpenseClaim.STATUS_APPROVED:
+                raise serializers.ValidationError("Cannot modify an already approved expense claim.")
+            
+            serializer.validated_data.pop("status", None)
+            serializer.validated_data.pop("reviewer_note", None)
+        
+        record = serializer.save()
+        
+        # If HR approved, log audit and notify
+        if is_hr_or_above(self.request.user) and record.status in {ExpenseClaim.STATUS_APPROVED, ExpenseClaim.STATUS_REJECTED}:
+            create_audit_log(
+                actor=self.request.user,
+                scope="expenses",
+                action=f"expense_{record.status.lower()}",
+                target_type="expense",
+                target_id=str(record.id),
+                summary=f"Expense claim '{record.title}' was {record.status.lower()}ed.",
+                metadata={"amount": str(record.amount), "reviewer_note": record.reviewer_note},
+            )
+            recipient_user = getattr(record.employee, "user_account", None)
+            if recipient_user:
+                create_notification(
+                    recipient=recipient_user,
+                    title=f"Expense Claim {record.status}",
+                    body=f"Your expense claim '{record.title}' for {record.amount} has been {record.status.lower()}.",
+                    actor=self.request.user,
+                    notification_type="expense",
+                    target_url="/expenses",
+                    reference_type="expense",
+                    reference_id=str(record.id),
+                )
+
+
 class ReportsOverviewView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1660,5 +1787,86 @@ class ReportsOverviewView(APIView):
                 "sections": sections,
             }
         )
+
+
+class DocumentEsignViewSet(viewsets.ModelViewSet):
+    serializer_class = DocumentEsignSerializer
+    queryset = DocumentEsign.objects.all()
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not is_hr_or_above(request.user):
+            self.permission_denied(request, message="Only HR can configure e-sign templates.")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if is_employee(user):
+            employee = getattr(user, "employee_profile", None)
+            if not employee:
+                return qs.none()
+            q_all = Q(distribution_type="all")
+            q_dept = Q(distribution_type="department", target_department=employee.department)
+            q_role = Q(distribution_type="role", target_role__iexact=employee.role)
+            return qs.filter(q_all | q_dept | q_role)
+        return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save(uploaded_by=self.request.user)
+        # Automatically create DocumentSignature placeholders
+        from employees.models import Employee
+        target_employees = Employee.objects.filter(is_active=True)
+        if instance.distribution_type == "department" and instance.target_department:
+            target_employees = target_employees.filter(department=instance.target_department)
+        elif instance.distribution_type == "role" and instance.target_role:
+            target_employees = target_employees.filter(role__iexact=instance.target_role)
+        
+        signatures = []
+        for emp in target_employees:
+            if not DocumentSignature.objects.filter(document=instance, employee=emp).exists():
+                signatures.append(DocumentSignature(
+                    document=instance,
+                    employee=emp,
+                    status="pending"
+                ))
+        if signatures:
+            DocumentSignature.objects.bulk_create(signatures)
+
+
+class DocumentSignatureViewSet(viewsets.ModelViewSet):
+    serializer_class = DocumentSignatureSerializer
+    queryset = DocumentSignature.objects.all()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if is_employee(user):
+            employee = getattr(user, "employee_profile", None)
+            if not employee:
+                return qs.none()
+            return qs.filter(employee=employee)
+        return qs
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        if is_employee(self.request.user):
+            employee = getattr(self.request.user, "employee_profile", None)
+            if not employee or instance.employee != employee:
+                raise serializers.ValidationError("You can only sign your own documents.")
+        
+        if serializer.validated_data.get("status") == "signed":
+            ip = self.request.META.get("HTTP_X_FORWARDED_FOR", self.request.META.get("REMOTE_ADDR", ""))
+            if ip:
+                ip = ip.split(",")[0].strip()
+            user_agent = self.request.META.get("HTTP_USER_AGENT", "")
+            
+            serializer.save(
+                status="signed",
+                signed_at=timezone.now(),
+                ip_address=ip,
+                user_agent=user_agent
+            )
+        else:
+            serializer.save()
 
 

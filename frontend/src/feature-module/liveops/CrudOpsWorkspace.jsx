@@ -72,6 +72,8 @@ const CrudOpsWorkspace = ({
   extraRowActions = null,
   variant = "table",
   summaryBuilder = null,
+  children = null,
+  hideDefaultLayout = false,
 }) => {
   const [records, setRecords] = useState([]);
   const [dependencies, setDependencies] = useState({});
@@ -264,127 +266,131 @@ const CrudOpsWorkspace = ({
           </span>
         </HrmHero>
 
-        <div className="row g-4">
-          <div className="col-xl-8">
-            <div className="card payroll-panel payroll-table-card">
-              <div className="payroll-table-header">
-                <div>
-                  <h5>{title} Workspace</h5>
-                  <div className="payroll-table-subtitle">{subtitle}</div>
-                </div>
-                <div className="payroll-table-controls">
-                  <input className="form-control" style={{ minWidth: 240 }} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.target.value)} />
-                  {filters.map((filter) => {
-                    const options = typeof filter.options === "function" ? filter.options(dependencies) : filter.options || dependencies?.[filter.optionsKey] || [];
-                    return (
-                      <select key={filter.name} className="form-select" value={filterState[filter.name] || ""} onChange={(event) => setFilterState((current) => ({ ...current, [filter.name]: event.target.value }))}>
-                        <option value="">{filter.placeholder || `All ${filter.label}`}</option>
-                        {options.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })}
-                  <input type="date" className="form-control" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-                  <input type="date" className="form-control" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-                  <div className="payroll-filter-actions">
-                    <span className="payroll-filter-meta">
-                      Filters <strong>{appliedFilters}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-light"
-                      onClick={() => {
-                        setSearch("");
-                        setDateFrom("");
-                        setDateTo("");
-                        setFilterState(filters.reduce((acc, item) => ({ ...acc, [item.name]: item.defaultValue || "" }), {}));
-                      }}
-                    >
-                      Reset
-                    </button>
+        {children}
+
+        {!hideDefaultLayout && (
+          <div className="row g-4">
+            <div className="col-xl-8">
+              <div className="card payroll-panel payroll-table-card">
+                <div className="payroll-table-header">
+                  <div>
+                    <h5>{title} Workspace</h5>
+                    <div className="payroll-table-subtitle">{subtitle}</div>
+                  </div>
+                  <div className="payroll-table-controls">
+                    <input className="form-control" style={{ minWidth: 240 }} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.target.value)} />
+                    {filters.map((filter) => {
+                      const options = typeof filter.options === "function" ? filter.options(dependencies) : filter.options || dependencies?.[filter.optionsKey] || [];
+                      return (
+                        <select key={filter.name} className="form-select" value={filterState[filter.name] || ""} onChange={(event) => setFilterState((current) => ({ ...current, [filter.name]: event.target.value }))}>
+                          <option value="">{filter.placeholder || `All ${filter.label}`}</option>
+                          {options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })}
+                    <input type="date" className="form-control" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+                    <input type="date" className="form-control" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+                    <div className="payroll-filter-actions">
+                      <span className="payroll-filter-meta">
+                        Filters <strong>{appliedFilters}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-light"
+                        onClick={() => {
+                          setSearch("");
+                          setDateFrom("");
+                          setDateTo("");
+                          setFilterState(filters.reduce((acc, item) => ({ ...acc, [item.name]: item.defaultValue || "" }), {}));
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="card-body">
-                {loading ? (
-                  <div className="text-center py-5 text-muted">Loading {title.toLowerCase()}...</div>
-                ) : filteredRecords.length === 0 ? (
-                  <HrmEmptyState title={emptyTitle} description={emptyDescription} />
-                ) : variant === "cards" ? (
-                  <div className="row g-3">
-                    {filteredRecords.map((record) => (
-                      <div className="col-md-6" key={record.id}>
-                        <div className="card payroll-section-card h-100">
-                          <div className="card-body d-flex flex-column gap-3">
-                            <div className="d-flex justify-content-between gap-3">
-                              <div>
-                                <h6 className="mb-1">{record.title || record.name || record.asset_name || record.candidate_name || record.first_name}</h6>
-                                <div className="text-muted small">{record.department_name || record.location || record.referrer_name || record.asset_code || record.email || "Operational record"}</div>
-                              </div>
-                              {record.status || record.stage ? <span className={`payroll-badge ${toneClass(statusTone(record.status || record.stage))}`}>{record.status || record.stage}</span> : null}
-                            </div>
-                            <div className="payroll-summary-list">
-                              {columns.slice(0, 4).map((column) => (
-                                <div className="payroll-summary-row" key={column.label}>
-                                  <span>{column.label}</span>
-                                  <strong>{column.text ? column.text(record, dependencies) : "-"}</strong>
+                <div className="card-body">
+                  {loading ? (
+                    <div className="text-center py-5 text-muted">Loading {title.toLowerCase()}...</div>
+                  ) : filteredRecords.length === 0 ? (
+                    <HrmEmptyState title={emptyTitle} description={emptyDescription} />
+                  ) : variant === "cards" ? (
+                    <div className="row g-3">
+                      {filteredRecords.map((record) => (
+                        <div className="col-md-6" key={record.id}>
+                          <div className="card payroll-section-card h-100">
+                            <div className="card-body d-flex flex-column gap-3">
+                              <div className="d-flex justify-content-between gap-3">
+                                <div>
+                                  <h6 className="mb-1">{record.title || record.name || record.asset_name || record.candidate_name || record.first_name}</h6>
+                                  <div className="text-muted small">{record.department_name || record.location || record.referrer_name || record.asset_code || record.email || "Operational record"}</div>
                                 </div>
-                              ))}
-                            </div>
-                            <div className="d-flex gap-2 mt-auto">
-{extraRowActions ? extraRowActions(record, { refresh: load, dependencies }) : null}
-                              {allowEdit ? <button type="button" className="btn btn-light w-100" onClick={() => openEdit(record)}>Edit</button> : null}
-                              {canDelete ? <button type="button" className="btn btn-outline-danger w-100" onClick={() => deleteRecord(record.id)}>Delete</button> : null}
+                                {record.status || record.stage ? <span className={`payroll-badge ${toneClass(statusTone(record.status || record.stage))}`}>{record.status || record.stage}</span> : null}
+                              </div>
+                              <div className="payroll-summary-list">
+                                {columns.slice(0, 4).map((column) => (
+                                  <div className="payroll-summary-row" key={column.label}>
+                                    <span>{column.label}</span>
+                                    <strong>{column.text ? column.text(record, dependencies) : "-"}</strong>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="d-flex gap-2 mt-auto">
+  {extraRowActions ? extraRowActions(record, { refresh: load, dependencies }) : null}
+                                {allowEdit ? <button type="button" className="btn btn-light w-100" onClick={() => openEdit(record)}>Edit</button> : null}
+                                {canDelete ? <button type="button" className="btn btn-outline-danger w-100" onClick={() => deleteRecord(record.id)}>Delete</button> : null}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table align-middle mb-0">
-                      <thead>
-                        <tr>
-                          {columns.map((column) => (
-                            <th key={column.label}>{column.label}</th>
-                          ))}
-{hasAnyActions ? <th className="text-end">Actions</th> : null}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRecords.map((record) => (
-                          <tr key={record.id}>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table align-middle mb-0">
+                        <thead>
+                          <tr>
                             {columns.map((column) => (
-                              <td key={column.label}>{column.render(record, dependencies)}</td>
+                              <th key={column.label}>{column.label}</th>
                             ))}
-{hasAnyActions ? (
-                            <td>
-                              <div className="d-flex justify-content-end gap-2 flex-wrap">
-                                {extraRowActions ? extraRowActions(record, { refresh: load, dependencies }) : null}
-                                {allowEdit ? <button type="button" className="btn btn-sm btn-light" onClick={() => openEdit(record)}>Edit</button> : null}
-                                {canDelete ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => deleteRecord(record.id)}>Delete</button> : null}
-                              </div>
-                            </td>
-                            ) : null}
+  {hasAnyActions ? <th className="text-end">Actions</th> : null}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {filteredRecords.map((record) => (
+                            <tr key={record.id}>
+                              {columns.map((column) => (
+                                <td key={column.label}>{column.render(record, dependencies)}</td>
+                              ))}
+  {hasAnyActions ? (
+                              <td>
+                                <div className="d-flex justify-content-end gap-2 flex-wrap">
+                                  {extraRowActions ? extraRowActions(record, { refresh: load, dependencies }) : null}
+                                  {allowEdit ? <button type="button" className="btn btn-sm btn-light" onClick={() => openEdit(record)}>Edit</button> : null}
+                                  {canDelete ? <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => deleteRecord(record.id)}>Delete</button> : null}
+                                </div>
+                              </td>
+                              ) : null}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-xl-4">
-            <HrmSideList title="Live Highlights" items={highlights} emptyLabel="No highlights yet." />
+            <div className="col-xl-4">
+              <HrmSideList title="Live Highlights" items={highlights} emptyLabel="No highlights yet." />
+            </div>
           </div>
-        </div>
+        )}
 
         <HrmModal
           open={showModal}

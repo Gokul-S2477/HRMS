@@ -308,6 +308,33 @@ def ensure_onboarding_record(candidate: RecruitmentCandidate, actor=None) -> Onb
     return record
 
 
+def run_accrual_catchup(balance: LeaveBalance):
+    today = timezone.now().date()
+    if balance.year != today.year:
+        return
+        
+    settings = get_leave_settings_payload()
+    accrual_rate = as_decimal(settings.get("monthly_accrual_rate") or "1.5")
+    
+    for m in range(1, today.month + 1):
+        exists = balance.ledger_entries.filter(
+            entry_type=LeaveLedgerEntry.ENTRY_ALLOCATION,
+            metadata__accrual_month=m,
+            metadata__accrual_year=today.year
+        ).exists()
+        
+        if not exists:
+            month_name = date(today.year, m, 1).strftime("%B")
+            LeaveLedgerEntry.objects.create(
+                employee=balance.employee,
+                balance=balance,
+                leave_type=balance.leave_type,
+                entry_type=LeaveLedgerEntry.ENTRY_ALLOCATION,
+                days=accrual_rate,
+                description=f"Monthly accrual credit for {month_name} {today.year}",
+                metadata={"accrual_month": m, "accrual_year": today.year},
+            )
+
 def ensure_leave_balance(employee: Employee, leave_type: str, year: int) -> LeaveBalance:
     settings = get_leave_settings_payload()
     default_allocation = as_decimal(settings.get("max_leave_days") or 24)
@@ -336,6 +363,10 @@ def ensure_leave_balance(employee: Employee, leave_type: str, year: int) -> Leav
         balance.annual_allocation = annual_allocation
         balance.carry_forward = carry_forward
         balance.save(update_fields=["annual_allocation", "carry_forward", "updated_at"])
+        
+    # Catch up monthly accruals
+    run_accrual_catchup(balance)
+    
     return balance
 
 
@@ -343,6 +374,7 @@ def recalculate_leave_balance(balance: LeaveBalance):
     approved = Decimal("0")
     pending = Decimal("0")
     adjusted = Decimal("0")
+    credited = Decimal("0")
     for entry in balance.ledger_entries.all():
         if entry.entry_type == LeaveLedgerEntry.ENTRY_APPROVED_DEBIT:
             approved += as_decimal(entry.days)
@@ -350,10 +382,13 @@ def recalculate_leave_balance(balance: LeaveBalance):
             pending += as_decimal(entry.days)
         elif entry.entry_type == LeaveLedgerEntry.ENTRY_ADJUSTMENT:
             adjusted += as_decimal(entry.days)
+        elif entry.entry_type == LeaveLedgerEntry.ENTRY_ALLOCATION:
+            credited += as_decimal(entry.days)
     balance.used = approved
     balance.pending = pending
     balance.adjusted = adjusted
-    balance.save(update_fields=["used", "pending", "adjusted", "updated_at"])
+    balance.credited = credited
+    balance.save(update_fields=["used", "pending", "adjusted", "credited", "updated_at"])
 
 
 @transaction.atomic
@@ -394,7 +429,7 @@ def sync_leave_request_resource(resource: Resource, actor=None):
             metadata={"from_date": data.get("from_date"), "to_date": data.get("to_date")},
             created_by=actor,
         )
-    elif status_value == "pending" and working_days:
+    elif status_value in {"pending", "supervisor approved"} and working_days:
         LeaveLedgerEntry.objects.create(
             employee=employee,
             balance=balance,
@@ -409,22 +444,54 @@ def sync_leave_request_resource(resource: Resource, actor=None):
 
     recalculate_leave_balance(balance)
 
+    # Multi-level notifications
+    supervisor = employee.reporting_to
     if actor and is_employee(actor):
-        notify_roles(
-            {User.ROLE_HR, User.ROLE_STAKEHOLDER, User.ROLE_SUPER_ADMIN, User.ROLE_ADMIN},
-            title=f"Leave request from {employee.first_name}",
-            body=f"{employee.first_name} requested {working_days} day(s) of {leave_type} leave.",
-            actor=actor,
-            notification_type="leave_request",
-            target_url="/leaves",
-            reference_type="leave-request",
-            reference_id=str(resource.id),
-            metadata={"employee_id": employee.id, "leave_type": leave_type},
-        )
+        # Notify supervisor first if reporting hierarchy is set
+        if status_value == "pending" and supervisor and getattr(supervisor, "user_account", None):
+            create_notification(
+                supervisor.user_account,
+                title=f"Leave request from {employee.first_name} pending your review",
+                body=f"{employee.first_name} requested {working_days} day(s) of {leave_type} leave.",
+                actor=actor,
+                notification_type="leave_request",
+                target_url="/leaves",
+                reference_type="leave-request",
+                reference_id=str(resource.id),
+                metadata={"employee_id": employee.id, "leave_type": leave_type},
+            )
+        else:
+            # Otherwise notify HR/Admin
+            notify_roles(
+                {User.ROLE_HR, User.ROLE_STAKEHOLDER, User.ROLE_SUPER_ADMIN, User.ROLE_ADMIN},
+                title=f"Leave request from {employee.first_name}",
+                body=f"{employee.first_name} requested {working_days} day(s) of {leave_type} leave.",
+                actor=actor,
+                notification_type="leave_request",
+                target_url="/leaves",
+                reference_type="leave-request",
+                reference_id=str(resource.id),
+                metadata={"employee_id": employee.id, "leave_type": leave_type},
+            )
     elif getattr(employee, "user_account", None) and actor:
+        # If supervisor approves, notify HR/Admin for final approval
+        if status_value == "supervisor approved":
+            notify_roles(
+                {User.ROLE_HR, User.ROLE_STAKEHOLDER, User.ROLE_SUPER_ADMIN, User.ROLE_ADMIN},
+                title=f"Supervisor approved leave request from {employee.first_name}",
+                body=f"Supervisor approved {employee.first_name}'s request for {working_days} day(s) of {leave_type} leave. Pending final HR approval.",
+                actor=actor,
+                notification_type="leave_request",
+                target_url="/leaves",
+                reference_type="leave-request",
+                reference_id=str(resource.id),
+                metadata={"employee_id": employee.id, "leave_type": leave_type},
+            )
+        
+        # Notify the employee
         create_notification(
             employee.user_account,
-            title=f"Leave {data.get('status') or 'updated'}",
+            title=f"Leave request {data.get('status') or 'updated'}",
             body=f"Your {leave_type} leave request for {working_days} day(s) was marked {data.get('status') or 'updated'} by {actor.get_display_name()}.",
             actor=actor,
             notification_type="leave_review",

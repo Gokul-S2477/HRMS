@@ -508,6 +508,11 @@ export const SidebarDataTest = [
             base: 'employees',
             base2: 'policy',
           },
+          {
+            label: 'Org Chart',
+            link: routes.orgChart,
+            base: 'org-chart',
+          },
         ],
       },
       {
@@ -691,6 +696,27 @@ export const SidebarDataTest = [
         base: 'termination',
         materialicons: 'manage_accounts',
         submenuItems: [],
+      },
+      {
+        label: 'Reimbursements',
+        link: 'reimbursements',
+        submenu: true,
+        showSubRoute: false,
+        icon: 'file-text',
+        base: 'reimbursements',
+        materialicons: 'receipt',
+        submenuItems: [
+          {
+            label: 'Expense Claims',
+            link: routes.expenseClaims,
+            base: 'expenses',
+          },
+          {
+            label: 'Claims Approval',
+            link: routes.expenseApprovals,
+            base: 'expense-approvals',
+          },
+        ],
       },
     ],
   },

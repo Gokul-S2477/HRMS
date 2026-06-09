@@ -62,4 +62,51 @@ export const fetchAssetCategoryOptions = async () => {
   }));
 };
 
+export const fetchProjectOptions = async () => {
+  try {
+    const [projRes, crmRes] = await Promise.allSettled([
+      API.get("/data/projects/"),
+      API.get("/data/crm-deals/")
+    ]);
+    
+    const projects = projRes.status === "fulfilled" ? normalizeList(projRes.value.data) : [];
+    const deals = crmRes.status === "fulfilled" ? normalizeList(crmRes.value.data) : [];
+    
+    const projectNames = new Set();
+    const options = [];
+    
+    projects.forEach((item) => {
+      const name = item.data?.name || item.name;
+      if (name && !projectNames.has(name)) {
+        projectNames.add(name);
+        options.push({ value: name, label: name });
+      }
+    });
+    
+    deals.forEach((item) => {
+      const name = item.data?.deal_name || item.deal_name;
+      if (name && !projectNames.has(name)) {
+        projectNames.add(name);
+        options.push({ value: name, label: name });
+      }
+    });
+    
+    if (options.length === 0) {
+      ["Website Revamp", "HR Portal Setup", "Hospital Dashboard", "People Ops Revamp"].forEach((name) => {
+        options.push({ value: name, label: name });
+      });
+    }
+    
+    return options;
+  } catch (error) {
+    console.error("Failed to fetch project options", error);
+    return [
+      { value: "Website Revamp", label: "Website Revamp" },
+      { value: "HR Portal Setup", label: "HR Portal Setup" },
+      { value: "Hospital Dashboard", label: "Hospital Dashboard" },
+      { value: "People Ops Revamp", label: "People Ops Revamp" }
+    ];
+  }
+};
+
 export { normalizeList };

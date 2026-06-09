@@ -125,8 +125,13 @@ const EmployeeDetails: React.FC = () => {
     idParam || queryId || (user?.employee_profile?.id ? String(user.employee_profile.id) : "");
   const navigate = useNavigate();
   const canEditEmployee = role !== "employee";
+  const isSelf = user?.employee_profile?.id && String(user.employee_profile.id) === String(employeeId);
+  const canRequestEdit = role === "employee" && isSelf;
+  const canEditDirectly = role !== "employee";
+  const showEditButtons = canEditDirectly || canRequestEdit;
 
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -203,6 +208,29 @@ const EmployeeDetails: React.FC = () => {
     }
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    if (!employeeId) return;
+    try {
+      const res = await API.get("data/profile-update-requests/");
+      const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+      const filtered = list.filter((r: any) => String(r.data?.employee_id) === String(employeeId));
+      setRequests(filtered);
+    } catch (err) {
+      console.error("Failed to load requests:", err);
+    }
+  }, [employeeId]);
+
+  const cancelRequest = async (requestId: string) => {
+    if (!window.confirm("Cancel this update request?")) return;
+    try {
+      await API.delete(`data/profile-update-requests/${requestId}/`);
+      loadRequests();
+    } catch (err) {
+      console.error("Failed to cancel request:", err);
+      alert("Failed to cancel request.");
+    }
+  };
+
   useEffect(() => {
     loadEmployeeList();
   }, [loadEmployeeList]);
@@ -210,8 +238,9 @@ const EmployeeDetails: React.FC = () => {
   useEffect(() => {
     if (employeeId) {
       loadEmployee();
+      loadRequests();
     }
-  }, [employeeId, loadEmployee]);
+  }, [employeeId, loadEmployee, loadRequests]);
 
   useEffect(() => {
     if (!employee) return;
@@ -270,8 +299,45 @@ const EmployeeDetails: React.FC = () => {
     window.location.href = `mailto:${employee.email}`;
   };
 
+  const getCurrentDataForSection = (section: string) => {
+    if (!employee) return {};
+    const data: any = {};
+    if (section === "basic") {
+      data.email = employee.email;
+      data.phone = employee.phone;
+      data.gender = employee.gender;
+      data.date_of_birth = employee.date_of_birth;
+      data.address = employee.address;
+    } else if (section === "personal") {
+      data.national_id = employee.national_id;
+      data.marital_status = employee.marital_status;
+      data.personal_info = employee.personal_info;
+      data.family_info = employee.family_info;
+    } else if (section === "emergency") {
+      data.emergency_contact_name = employee.emergency_contact_name;
+      data.emergency_contact_number = employee.emergency_contact_number;
+      data.family_info = employee.family_info;
+    } else if (section === "about") {
+      data.about = employee.about;
+    } else if (section === "bank") {
+      data.bank_info = employee.bank_info;
+    } else if (section === "family") {
+      data.family_info = employee.family_info;
+      data.personal_info = employee.personal_info;
+    } else if (section === "education") {
+      data.education = employee.education;
+    } else if (section === "experience") {
+      data.experience = employee.experience;
+    } else if (section === "projects") {
+      data.projects = employee.projects;
+    } else if (section === "assets") {
+      data.assets = employee.assets;
+    }
+    return data;
+  };
+
   const saveSection = async () => {
-    if (!canEditEmployee) return;
+    if (!showEditButtons) return;
     if (!employeeId || !editSection) return;
     setSavingSection(true);
     const payload: any = {};
@@ -342,8 +408,26 @@ const EmployeeDetails: React.FC = () => {
     if (editSection === "assets") payload.assets = assetsForm;
 
     try {
-      const res = await API.patch(`employees/${employeeId}/`, payload);
-      setEmployee(res.data);
+      if (canEditDirectly) {
+        const res = await API.patch(`employees/${employeeId}/`, payload);
+        setEmployee(res.data);
+        alert("Details updated successfully.");
+      } else {
+        const requestPayload = {
+          employee_id: Number(employeeId),
+          employee_name: employee ? `${employee.first_name} ${employee.last_name || ""}`.trim() : "",
+          section: editSection,
+          proposed_changes: payload,
+          current_data: getCurrentDataForSection(editSection),
+          status: "Pending",
+          requested_on: new Date().toISOString().split("T")[0],
+          requested_by: user?.email || "",
+          comments: "",
+        };
+        await API.post("data/profile-update-requests/", { data: requestPayload });
+        alert("Your profile update request has been submitted for HR approval.");
+        loadRequests();
+      }
       setEditSection(null);
     } catch (err) {
       console.error("Failed to save section:", err);
@@ -747,7 +831,7 @@ const EmployeeDetails: React.FC = () => {
                   </div>
                   <div className="col-lg-4 text-lg-end">
                     <div className="d-flex flex-wrap justify-content-lg-end gap-2">
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button
                           className="btn btn-outline-primary"
                           type="button"
@@ -889,7 +973,7 @@ const EmployeeDetails: React.FC = () => {
                       Primary contact and address information
                     </p>
                   </div>
-                  {canEditEmployee ? (
+                  {showEditButtons ? (
                     <button className="btn btn-sm btn-light" type="button" onClick={() => setEditSection("basic")}>
                       <i className="ti ti-edit" />
                     </button>
@@ -904,7 +988,7 @@ const EmployeeDetails: React.FC = () => {
                     <h6 className="mb-1">Personal Information</h6>
                     <p className="payroll-table-subtitle mb-0">Identity and household context</p>
                   </div>
-                  {canEditEmployee ? (
+                  {showEditButtons ? (
                     <button className="btn btn-sm btn-light" type="button" onClick={() => setEditSection("personal")}>
                       <i className="ti ti-edit" />
                     </button>
@@ -921,7 +1005,7 @@ const EmployeeDetails: React.FC = () => {
                       Escalation contacts for urgent situations
                     </p>
                   </div>
-                  {canEditEmployee ? (
+                  {showEditButtons ? (
                     <button className="btn btn-sm btn-light" type="button" onClick={() => setEditSection("emergency")}>
                       <i className="ti ti-edit" />
                     </button>
@@ -941,7 +1025,7 @@ const EmployeeDetails: React.FC = () => {
                       Narrative summary and current focus area
                     </p>
                   </div>
-                  {canEditEmployee ? (
+                  {showEditButtons ? (
                     <button className="btn btn-sm btn-light" onClick={() => setEditSection("about")}>
                       <i className="ti ti-edit" />
                     </button>
@@ -975,7 +1059,7 @@ const EmployeeDetails: React.FC = () => {
                           Payroll and statutory details
                         </p>
                       </div>
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("bank")}>
                           <i className="ti ti-edit" />
                         </button>
@@ -1000,7 +1084,7 @@ const EmployeeDetails: React.FC = () => {
                           Household context and backup emergency data
                         </p>
                       </div>
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("family")}>
                           <i className="ti ti-edit" />
                         </button>
@@ -1027,7 +1111,7 @@ const EmployeeDetails: React.FC = () => {
                           Academic background and qualifications
                         </p>
                       </div>
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("education")}>
                           <i className="ti ti-edit" />
                         </button>
@@ -1063,7 +1147,7 @@ const EmployeeDetails: React.FC = () => {
                           Previous companies and roles
                         </p>
                       </div>
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("experience")}>
                           <i className="ti ti-edit" />
                         </button>
@@ -1109,12 +1193,12 @@ const EmployeeDetails: React.FC = () => {
                       </li>
                     </ul>
                     <div className="d-flex gap-2">
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("projects")}>
                           <i className="ti ti-edit" /> Projects
                         </button>
                       ) : null}
-                      {canEditEmployee ? (
+                      {showEditButtons ? (
                         <button className="btn btn-sm btn-light" onClick={() => setEditSection("assets")}>
                           <i className="ti ti-edit" /> Assets
                         </button>
@@ -1197,6 +1281,85 @@ const EmployeeDetails: React.FC = () => {
 )}                    </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="card employee-section-card mt-4">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="mb-1">Profile Update Requests History</h6>
+                  <p className="payroll-table-subtitle mb-0">
+                    Self-service request submissions, statuses, and HR approval notes
+                  </p>
+                </div>
+                <span className="badge bg-outline-primary rounded-pill">{requests.length} requests</span>
+              </div>
+              <div className="card-body">
+                {requests.length === 0 ? (
+                  <p className="text-muted mb-0">No self-service update requests submitted yet.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table align-middle mb-0 text-nowrap">
+                      <thead>
+                        <tr>
+                          <th>Section</th>
+                          <th>Requested On</th>
+                          <th>Status</th>
+                          <th>Reviewed By</th>
+                          <th>HR Comments / Notes</th>
+                          <th className="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {requests.map((r) => {
+                          const rData = r.data || {};
+                          const status = rData.status || "Pending";
+                          let badgeClass = "bg-warning-light text-warning";
+                          if (status === "Approved") badgeClass = "bg-success-light text-success";
+                          if (status === "Rejected") badgeClass = "bg-danger-light text-danger";
+                          
+                          return (
+                            <tr key={r.id}>
+                              <td>
+                                <strong className="text-dark">
+                                  {String(rData.section || "profile").replace("_", " ").toUpperCase()}
+                                </strong>
+                              </td>
+                              <td>{rData.requested_on || "-"}</td>
+                              <td>
+                                <span className={`badge ${badgeClass} px-3 py-2`}>{status}</span>
+                              </td>
+                              <td>
+                                {rData.reviewed_by ? (
+                                  <div>
+                                    <div>{rData.reviewed_by}</div>
+                                    <small className="text-muted">{rData.reviewed_role}</small>
+                                  </div>
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
+                              <td>{rData.comments || rData.approval_note || "-"}</td>
+                              <td className="text-end">
+                                {status === "Pending" ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-danger btn-sm"
+                                    onClick={() => cancelRequest(r.id)}
+                                  >
+                                    Cancel Request
+                                  </button>
+                                ) : (
+                                  <span className="text-muted small">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
             </div>

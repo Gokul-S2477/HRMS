@@ -150,6 +150,16 @@ def recalculate_employee_payroll(payroll: EmployeePayroll, *, save: bool = True)
     payroll.approved_overtime_hours = overtime_hours
     payroll.overtime_amount = overtime_amount
 
+    from django.db.models import Q
+    from coredata.models import ExpenseClaim
+    approved_claims = ExpenseClaim.objects.filter(
+        employee=payroll.employee,
+        claim_date__gte=cycle_start,
+        claim_date__lte=cycle_end,
+        status=ExpenseClaim.STATUS_APPROVED,
+    ).filter(Q(processed_in_payroll__isnull=True) | Q(processed_in_payroll=payroll))
+    payroll.reimbursement_amount = money(sum((claim.amount for claim in approved_claims), Decimal("0")))
+
     loss_of_pay_days = calculate_leave_without_pay_days(payroll.employee, cycle_start, cycle_end)
     payroll.loss_of_pay_days = loss_of_pay_days
     computed_leave_deduction = money(payroll_daily_rate(payroll, profile) * loss_of_pay_days)
@@ -260,6 +270,7 @@ def recalculate_employee_payroll(payroll: EmployeePayroll, *, save: bool = True)
 
     if save:
         payroll.save()
+        approved_claims.update(processed_in_payroll=payroll)
         if payroll.components.exists():
             payroll.recalculate()
             payroll.save(update_fields=["gross_salary", "total_deductions", "net_salary", "total_salary", "updated_at"])

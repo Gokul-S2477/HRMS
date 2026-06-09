@@ -69,7 +69,7 @@ const NotificationBell: React.FC = () => {
 
   return (
     <div className="dropdown">
-      <button type="button" className="btn btn-menubar position-relative" data-bs-toggle="dropdown" aria-expanded="false">
+      <button type="button" className="nh-icon-btn position-relative" data-bs-toggle="dropdown" aria-expanded="false">
         <i className="ti ti-bell"></i>
         {unreadCount ? <span className="badge bg-danger rounded-pill position-absolute top-0 start-100 translate-middle">{unreadCount}</span> : null}
       </button>

@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from employees.models import Employee
+from employees.models import Department, Employee
 
 from .models import (
     ApplicantAccount,
@@ -32,6 +32,9 @@ from .models import (
     RecruitmentReferral,
     ShiftDefinition,
     TimesheetEntry,
+    ExpenseClaim,
+    DocumentEsign,
+    DocumentSignature,
 )
 
 User = get_user_model()
@@ -1122,3 +1125,107 @@ class RecruitmentReferralSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_by", "created_at", "updated_at", "job"]
+
+
+class ExpenseClaimSerializer(serializers.ModelSerializer):
+    employee = EmployeeMiniSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        source="employee",
+        queryset=Employee.objects.all(),
+        write_only=True,
+        required=False,
+    )
+    processed_in_payroll_id = serializers.PrimaryKeyRelatedField(
+        source="processed_in_payroll",
+        read_only=True,
+    )
+
+    class Meta:
+        model = ExpenseClaim
+        fields = [
+            "id",
+            "employee",
+            "employee_id",
+            "title",
+            "category",
+            "amount",
+            "claim_date",
+            "receipt_file",
+            "status",
+            "reviewer_note",
+            "processed_in_payroll_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at", "processed_in_payroll_id"]
+
+
+class DocumentSignatureSerializer(serializers.ModelSerializer):
+    employee = EmployeeMiniSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        source="employee",
+        queryset=Employee.objects.all(),
+        write_only=True,
+        required=False,
+    )
+    document_title = serializers.ReadOnlyField(source="document.title")
+    document_description = serializers.ReadOnlyField(source="document.description")
+    document_file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentSignature
+        fields = [
+            "id",
+            "document",
+            "document_title",
+            "document_description",
+            "document_file_url",
+            "employee",
+            "employee_id",
+            "status",
+            "signed_at",
+            "ip_address",
+            "user_agent",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_document_file_url(self, obj):
+        if obj.document and obj.document.file:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.document.file.url)
+            return obj.document.file.url
+        return ""
+
+
+class DocumentEsignSerializer(serializers.ModelSerializer):
+    uploaded_by = UserMiniSerializer(read_only=True)
+    target_department_name = serializers.ReadOnlyField(source="target_department.name")
+    target_department_id = serializers.PrimaryKeyRelatedField(
+        source="target_department",
+        queryset=Department.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+    signatures = DocumentSignatureSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DocumentEsign
+        fields = [
+            "id",
+            "title",
+            "description",
+            "file",
+            "distribution_type",
+            "target_department_name",
+            "target_department_id",
+            "target_role",
+            "uploaded_by",
+            "created_at",
+            "updated_at",
+            "signatures",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
