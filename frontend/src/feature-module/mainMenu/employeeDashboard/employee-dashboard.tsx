@@ -300,11 +300,15 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
+  // ── Keep a ref so loadData can read current user without it being a dep ──
+  const userRef = React.useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const freshUser = await refreshUser().catch(() => undefined);
-      const selfEmployeeId = freshUser?.employee_profile?.id || user?.employee_profile?.id || employeeId;
+      const currentUser = userRef.current;
+      const selfEmployeeId = currentUser?.employee_profile?.id;
       if (!selfEmployeeId) {
         setProfile(null);
         return;
@@ -340,11 +344,28 @@ const EmployeeDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [employeeId, refreshUser, user?.employee_profile?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // stable — reads user via ref to avoid infinite refresh loop
 
+  // On mount: refresh user once to get the latest employee_profile link,
+  // then run loadData. Never re-run this effect on user changes.
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let cancelled = false;
+    const init = async () => {
+      try {
+        const fresh = await refreshUser();
+        if (!cancelled) {
+          userRef.current = fresh;
+          await loadData();
+        }
+      } catch {
+        if (!cancelled) loadData();
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount-only — intentional
 
   const attendanceSummary = useMemo(() => {
     const summary = { present: 0, late: 0, remote: 0, absent: 0 };
@@ -462,7 +483,7 @@ const EmployeeDashboard: React.FC = () => {
     );
   }
 
-  if (!loading && !employeeId && !profile) {
+  if (!loading && !profile) {
     return (
       <div className="page-wrapper">
         <div className="content container-fluid payroll-shell employee-shell">
