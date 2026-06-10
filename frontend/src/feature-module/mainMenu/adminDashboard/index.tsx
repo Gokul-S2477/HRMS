@@ -344,30 +344,45 @@ const AdminDashboard = () => {
           <div className="card border-0">
             <div className="card-body d-flex align-items-center justify-content-between flex-wrap pb-1">
               <div className="d-flex align-items-center mb-3">
-                <span className="avatar avatar-xl flex-shrink-0">
-                  <ImageWithBasePath
-                    src="assets/img/profiles/avatar-31.jpg"
-                    className="rounded-circle"
-                    alt="img"
-                  />
-                </span>
+                {user?.employee_profile?.id ? (
+                  <Link
+                    to={routes.employeeDetailsView.replace(":id", String(user.employee_profile.id))}
+                    className="avatar avatar-xl flex-shrink-0"
+                  >
+                    <ImageWithBasePath
+                      src="assets/img/profiles/avatar-31.jpg"
+                      className="rounded-circle"
+                      alt="img"
+                    />
+                  </Link>
+                ) : (
+                  <span className="avatar avatar-xl flex-shrink-0">
+                    <ImageWithBasePath
+                      src="assets/img/profiles/avatar-31.jpg"
+                      className="rounded-circle"
+                      alt="img"
+                    />
+                  </span>
+                )}
                 <div className="ms-3">
                   <h3 className="mb-2">
                     Welcome Back, {user?.first_name || user?.username || "Adrian"}{" "}
-                    <Link to="#" className="edit-icon">
+                    <Link
+                      to={user?.employee_profile?.id ? routes.employeeDetailsView.replace(":id", String(user.employee_profile.id)) : "#"}
+                      className="edit-icon"
+                    >
                       <i className="ti ti-edit fs-14" />
                     </Link>
                   </h3>
                   <p>
                     You have{" "}
-                    <span className="text-primary text-decoration-underline">
-                      {stats?.pending_approvals ?? 0}
-                    </span>{" "}
-                    Pending Approvals &amp;{" "}
-                    <span className="text-primary text-decoration-underline">
-                      {stats?.pending_leave_requests ?? 0}
-                    </span>{" "}
-                    Leave Requests
+                    <Link to={routes.approvalInbox} className="text-primary text-decoration-underline fw-semibold">
+                      {stats?.pending_approvals ?? 0} Pending Approvals
+                    </Link>{" "}
+                    &amp;{" "}
+                    <Link to={routes.leaveadmin} className="text-primary text-decoration-underline fw-semibold">
+                      {stats?.pending_leave_requests ?? 0} Leave Requests
+                    </Link>
                   </p>
                 </div>
               </div>
@@ -787,7 +802,7 @@ const AdminDashboard = () => {
                           <i className="ti ti-award-filled text-primary fs-24" />
                         </span>
                         <Link
-                          to={`${routes.employeeDetails}/${stats.top_performer.id}`}
+                          to={routes.employeeDetailsView.replace(":id", String(stats.top_performer.id))}
                           className="avatar avatar-md me-2"
                         >
                           {stats.top_performer.photo ? (
@@ -807,7 +822,7 @@ const AdminDashboard = () => {
                         </Link>
                         <div>
                           <h6 className="text-truncate mb-1 fs-14 fw-medium">
-                            <Link to={`${routes.employeeDetails}/${stats.top_performer.id}`}>
+                            <Link to={routes.employeeDetailsView.replace(":id", String(stats.top_performer.id))}>
                               {stats.top_performer.full_name}
                             </Link>
                           </h6>

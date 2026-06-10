@@ -132,7 +132,7 @@ const EmployeeDetails: React.FC = () => {
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [editSection, setEditSection] = useState<

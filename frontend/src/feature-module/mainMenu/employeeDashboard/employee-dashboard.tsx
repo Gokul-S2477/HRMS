@@ -94,7 +94,7 @@ const EmployeeDashboard: React.FC = () => {
   const [training, setTraining] = useState<ResourceRecord[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalanceRecord[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [punchWorkMode, setPunchWorkMode] = useState("Office");
   const [saving, setSaving] = useState(false);
@@ -448,6 +448,19 @@ const EmployeeDashboard: React.FC = () => {
   }, [attendance.length, attendanceSummary, latestPayroll, leaveBalanceSummary.available, leaveBalanceSummary.pending, leaves.length, profile?.salary, ticketSummary]);
 
   const latestPayslipRoute = latestPayroll ? routes.payslipsView.replace(":id", String(latestPayroll.id)) : routes.payslips;
+
+  if (loading) {
+    return (
+      <div className="page-wrapper d-flex align-items-center justify-content-center" style={{ minHeight: "80vh" }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">Loading Dashboard...</span>
+          </div>
+          <p className="mt-3 text-muted">Loading employee workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!loading && !employeeId && !profile) {
     return (
