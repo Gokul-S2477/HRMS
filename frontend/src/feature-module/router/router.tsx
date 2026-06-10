@@ -17,13 +17,13 @@ const Router = () => {
       </Route>
 
       <Route element={<ProtectedRoute />}>
-        {protectedRoutes.map((route, idx) => (
-          <Route
-            key={idx}
-            path={route.path}
-            element={
-              <Feature>
-                {route.allowedRoles ? (
+        <Route element={<Feature />}>
+          {protectedRoutes.map((route, idx) => (
+            <Route
+              key={idx}
+              path={route.path}
+              element={
+                route.allowedRoles ? (
                   <RoleRoute
                     allowedRoles={route.allowedRoles}
                     forbiddenPath={(route as any).forbiddenPath}
@@ -32,11 +32,11 @@ const Router = () => {
                   </RoleRoute>
                 ) : (
                   route.element
-                )}
-              </Feature>
-            }
-          />
-        ))}
+                )
+              }
+            />
+          ))}
+        </Route>
       </Route>
     </Routes>
   );
