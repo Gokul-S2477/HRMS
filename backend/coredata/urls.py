@@ -13,6 +13,7 @@ from .public_recruitment_views import (
 )
 from .views import ResourceDetailView, ResourceListCreateView
 from .workflow_views import (
+    AdminDashboardStatsView,
     ApprovalInboxView,
     AssetAssignmentViewSet,
     AssetCategoryViewSet,
@@ -87,6 +88,7 @@ urlpatterns = [
         name="resource-detail",
     ),
     path("reports/overview/", ReportsOverviewView.as_view(), name="reports-overview"),
+    path("dashboard/admin/", AdminDashboardStatsView.as_view(), name="admin-dashboard-stats"),
     path("approvals/inbox/", ApprovalInboxView.as_view(), name="approval-inbox"),
     path("", include(router.urls)),
 ]

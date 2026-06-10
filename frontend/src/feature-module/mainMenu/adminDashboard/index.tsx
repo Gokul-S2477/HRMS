@@ -12,43 +12,75 @@ import RequestModals from "../../../core/modals/requestModal";
 import TodoModal from "../../../core/modals/todoModal";
 import CollapseHeader from "../../../core/common/collapse-header/collapse-header";
 import UpcomingReminderBanner from "../../liveops/UpcomingReminderBanner";
+import API from "../../../api/axios";
+import { useAuth } from "../../../core/auth/AuthContext";
 
 const AdminDashboard = () => {
   const routes = all_routes;
-
-  const [isTodo, setIsTodo] = useState([false, false, false]);
+  const { user } = useAuth();
 
   const [date, setDate] = useState(new Date());
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  //New Chart
-  const [empDepartment] = useState<any>({
+  // Todo Checkbox State
+  const [todos, setTodos] = useState<any[]>([]);
+
+  // Fetch Dashboard Stats
+  const fetchStats = async () => {
+    try {
+      const res = await API.get("/dashboard/admin/");
+      setStats(res.data);
+      if (res.data.todos) {
+        setTodos(res.data.todos);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching dashboard stats:", err);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  // Toggle Todo completion
+  const handleToggleTodo = async (todoId: string, currentStatus: boolean) => {
+    try {
+      // Optimistically update frontend state
+      setTodos(prev => prev.map(t => t.id === todoId ? { ...t, is_completed: !currentStatus } : t));
+      
+      // Patch to database
+      await API.patch(`/productivity/todos/${todoId}/`, {
+        data: {
+          is_completed: !currentStatus
+        }
+      });
+    } catch (err) {
+      console.error("Error toggling todo completion:", err);
+      // Revert if API failed
+      fetchStats();
+    }
+  };
+
+  // 1. Employees By Department Chart
+  const [empDepartment, setEmpDepartment] = useState<any>({
     chart: {
       height: 235,
       type: 'bar',
-      padding: {
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0
-      },
-      toolbar: {
-        show: false,
-      }
+      padding: { top: 0, left: 0, right: 0, bottom: 0 },
+      toolbar: { show: false }
     },
     fill: {
-      colors: ['#F26522'], // Fill color for the bars
-      opacity: 1, // Adjust opacity (1 is fully opaque)
+      colors: ['#F26522'],
+      opacity: 1,
     },
     colors: ['#F26522'],
     grid: {
       borderColor: '#E5E7EB',
       strokeDashArray: 5,
-      padding: {
-        top: -20,
-        left: 0,
-        right: 0,
-        bottom: 0
-      }
+      padding: { top: -20, left: 0, right: 0, bottom: 0 }
     },
     plotOptions: {
       bar: {
@@ -58,42 +90,40 @@ const AdminDashboard = () => {
         endingShape: 'rounded'
       }
     },
-    dataLabels: {
-      enabled: false
-    },
-    series: [{
-      data: [80, 110, 80, 20, 60, 100],
-      name: 'Employee'
-    }],
+    dataLabels: { enabled: false },
+    series: [{ data: [80, 110, 80, 20, 60, 100], name: 'Employee' }],
     xaxis: {
       categories: ['UI/UX', 'Development', 'Management', 'HR', 'Testing', 'Marketing'],
-      labels: {
-        style: {
-          colors: '#111827',
-          fontSize: '13px',
-        }
-      }
+      labels: { style: { colors: '#111827', fontSize: '13px' } }
     }
-  })
+  });
 
-  const [salesIncome] = useState<any>({
+  useEffect(() => {
+    if (stats && stats.department_chart) {
+      setEmpDepartment((prev: any) => ({
+        ...prev,
+        series: [{ data: stats.department_chart.counts, name: 'Employee' }],
+        xaxis: {
+          ...prev.xaxis,
+          categories: stats.department_chart.labels
+        }
+      }));
+    }
+  }, [stats]);
+
+  // 2. Sales vs Expenses stacked bar chart
+  const [salesIncome, setSalesIncome] = useState<any>({
     chart: {
       height: 290,
       type: 'bar',
       stacked: true,
-      toolbar: {
-        show: false,
-      }
+      toolbar: { show: false }
     },
-    colors: ['#FF6F28', '#F8F9FA'],
+    colors: ['#FF6F28', '#E5E7EB'],
     responsive: [{
       breakpoint: 480,
       options: {
-        legend: {
-          position: 'bottom',
-          offsetX: -10,
-          offsetY: 0
-        }
+        legend: { position: 'bottom', offsetX: -10, offsetY: 0 }
       }
     }],
     plotOptions: {
@@ -104,65 +134,63 @@ const AdminDashboard = () => {
         endingShape: 'rounded'
       },
     },
-    series: [{
-      name: 'Income',
-      data: [40, 30, 45, 80, 85, 90, 80, 80, 80, 85, 20, 80]
-    }, {
-      name: 'Expenses',
-      data: [60, 70, 55, 20, 15, 10, 20, 20, 20, 15, 80, 20]
-    }],
+    series: [
+      { name: 'Income', data: [40, 30, 45, 80, 85, 90, 80, 80, 80, 85, 20, 80] },
+      { name: 'Expenses', data: [60, 70, 55, 20, 15, 10, 20, 20, 20, 15, 80, 20] }
+    ],
     xaxis: {
       categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-      labels: {
-        style: {
-          colors: '#6B7280',
-          fontSize: '13px',
-        }
-      }
+      labels: { style: { colors: '#6B7280', fontSize: '13px' } }
     },
     yaxis: {
-      labels: {
-        offsetX: -15,
-        style: {
-          colors: '#6B7280',
-          fontSize: '13px',
-        }
-      }
+      labels: { offsetX: -15, style: { colors: '#6B7280', fontSize: '13px' } }
     },
     grid: {
       borderColor: '#E5E7EB',
       strokeDashArray: 5,
-      padding: {
-        left: -8,
-      },
+      padding: { left: -8 },
     },
-    legend: {
-      show: false
-    },
-    dataLabels: {
-      enabled: false // Disable data labels
-    },
-    fill: {
-      opacity: 1
-    },
-  })
+    legend: { show: false },
+    dataLabels: { enabled: false },
+    fill: { opacity: 1 },
+  });
 
-  //Attendance ChartJs
+  useEffect(() => {
+    if (stats && stats.sales_income_chart) {
+      setSalesIncome((prev: any) => ({
+        ...prev,
+        series: [
+          { name: 'Income', data: stats.sales_income_chart.income },
+          { name: 'Expenses', data: stats.sales_income_chart.expenses }
+        ]
+      }));
+    }
+  }, [stats]);
+
+  // 3. Attendance Donut chart (PrimeReact)
   const [chartData, setChartData] = useState({});
   const [chartOptions, setChartOptions] = useState({});
+
   useEffect(() => {
+    const isStatsAvailable = stats && stats.attendance_overview;
     const data = {
       labels: ['Late', 'Present', 'Permission', 'Absent'],
       datasets: [
-
         {
-          label: 'Semi Donut',
-          data: [40, 20, 30, 10],
-          backgroundColor: ['#0C4B5E', '#03C95A', '#FFC107', '#E70D0D'],
+          label: 'Attendance status',
+          data: isStatsAvailable 
+            ? [
+                stats.attendance_overview.late,
+                stats.attendance_overview.present,
+                stats.attendance_overview.permission,
+                stats.attendance_overview.absent
+              ]
+            : [40, 20, 30, 10],
+          backgroundColor: ['#FFC107', '#03C95A', '#1B84FF', '#E70D0D'],
           borderWidth: 5,
           borderRadius: 10,
-          borderColor: '#fff', // Border between segments
-          hoverBorderWidth: 0,   // Border radius for curved edges
+          borderColor: '#fff',
+          hoverBorderWidth: 0,
           cutout: '60%',
         }
       ]
@@ -171,46 +199,40 @@ const AdminDashboard = () => {
       rotation: -100,
       circumference: 200,
       layout: {
-        padding: {
-          top: -20,    // Set to 0 to remove top padding
-          bottom: -20, // Set to 0 to remove bottom padding
-        }
+        padding: { top: -20, bottom: -20 }
       },
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false // Hide the legend
-        }
-      },
+      plugins: { legend: { display: false } },
     };
 
     setChartData(data);
     setChartOptions(options);
-  }, []);
+  }, [stats]);
 
-  //Semi Donut ChartJs
+  // 4. Projects Status Donut chart (PrimeReact)
   const [semidonutData, setSemidonutData] = useState({});
   const [semidonutOptions, setSemidonutOptions] = useState({});
-  const toggleTodo = (index: number) => {
-    setIsTodo((prevIsTodo) => {
-      const newIsTodo = [...prevIsTodo];
-      newIsTodo[index] = !newIsTodo[index];
-      return newIsTodo;
-    });
-  };
-  useEffect(() => {
 
+  useEffect(() => {
+    const isStatsAvailable = stats && stats.projects_status;
     const data = {
       labels: ["Ongoing", "Onhold", "Completed", "Overdue"],
       datasets: [
         {
-          label: 'Semi Donut',
-          data: [20, 40, 20, 10],
+          label: 'Projects Status',
+          data: isStatsAvailable
+            ? [
+                stats.projects_status.ongoing,
+                stats.projects_status.onhold,
+                stats.projects_status.completed,
+                stats.projects_status.overdue
+              ]
+            : [20, 40, 20, 10],
           backgroundColor: ['#FFC107', '#1B84FF', '#03C95A', '#E70D0D'],
           borderWidth: -10,
-          borderColor: 'transparent', // Border between segments
-          hoverBorderWidth: 0,   // Border radius for curved edges
+          borderColor: 'transparent',
+          hoverBorderWidth: 0,
           cutout: '75%',
           spacing: -30,
         },
@@ -221,31 +243,32 @@ const AdminDashboard = () => {
       rotation: -100,
       circumference: 185,
       layout: {
-        padding: {
-          top: -20,    // Set to 0 to remove top padding
-          bottom: 20, // Set to 0 to remove bottom padding
-        }
+        padding: { top: -20, bottom: 20 }
       },
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false // Hide the legend
-        }
-      }, elements: {
-        arc: {
-          borderWidth: -30, // Ensure consistent overlap
-          borderRadius: 30, // Add some rounding
-        }
+      plugins: { legend: { display: false } },
+      elements: {
+        arc: { borderWidth: -30, borderRadius: 30 }
       },
     };
 
     setSemidonutData(data);
     setSemidonutOptions(options);
-  }, []);
+  }, [stats]);
 
-
-
+  if (loading) {
+    return (
+      <div className="page-wrapper d-flex align-items-center justify-content-center" style={{ minHeight: "80vh" }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">Loading Dashboard...</span>
+          </div>
+          <p className="mt-3 text-muted">Aggregating live HRMS Command Center statistics...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -330,7 +353,7 @@ const AdminDashboard = () => {
                 </span>
                 <div className="ms-3">
                   <h3 className="mb-2">
-                    Welcome Back, Adrian{" "}
+                    Welcome Back, {user?.first_name || user?.username || "Adrian"}{" "}
                     <Link to="#" className="edit-icon">
                       <i className="ti ti-edit fs-14" />
                     </Link>
@@ -338,11 +361,11 @@ const AdminDashboard = () => {
                   <p>
                     You have{" "}
                     <span className="text-primary text-decoration-underline">
-                      21
+                      {stats?.pending_approvals ?? 0}
                     </span>{" "}
                     Pending Approvals &amp;{" "}
                     <span className="text-primary text-decoration-underline">
-                      14
+                      {stats?.pending_leave_requests ?? 0}
                     </span>{" "}
                     Leave Requests
                   </p>
@@ -385,13 +408,13 @@ const AdminDashboard = () => {
                         Attendance
                       </h6>
                       <h3 className="mb-3">
-                        92/99{" "}
+                        {stats ? `${(stats.attendance_overview?.present ?? 0) + (stats.attendance_overview?.late ?? 0)}/${stats.active_employees ?? 0}` : "92/99"}{" "}
                         <span className="fs-12 fw-medium text-success">
                           <i className="fa-solid fa-caret-up me-1" />
                           +2.1%
                         </span>
                       </h3>
-                      <Link to="attendance-employee.html" className="link-default">
+                      <Link to={routes.attendanceadmin} className="link-default">
                         View Details
                       </Link>
                     </div>
@@ -407,13 +430,13 @@ const AdminDashboard = () => {
                         Total Project's
                       </h6>
                       <h3 className="mb-3">
-                        90/94{" "}
+                        {stats ? `${stats.projects_status?.completed ?? 0}/${stats.total_projects ?? 0}` : "90/94"}{" "}
                         <span className="fs-12 fw-medium text-danger">
                           <i className="fa-solid fa-caret-down me-1" />
                           -2.1%
                         </span>
                       </h3>
-                      <Link to="projects.html" className="link-default">
+                      <Link to={routes.projectlist} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -429,13 +452,13 @@ const AdminDashboard = () => {
                         Total Clients
                       </h6>
                       <h3 className="mb-3">
-                        69/86{" "}
+                        {stats ? `${stats.total_clients ?? 0}` : "69"}{" "}
                         <span className="fs-12 fw-medium text-danger">
                           <i className="fa-solid fa-caret-down me-1" />
                           -11.2%
                         </span>
                       </h3>
-                      <Link to="clients.html" className="link-default">
+                      <Link to={routes.clientlist} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -451,13 +474,13 @@ const AdminDashboard = () => {
                         Total Tasks
                       </h6>
                       <h3 className="mb-3">
-                        25/28{" "}
+                        {stats ? `${stats.todos?.filter((t: any) => t.is_completed).length ?? 0}/${stats.total_tasks ?? 0}` : "25/28"}{" "}
                         <span className="fs-12 fw-medium text-success">
                           <i className="fa-solid fa-caret-down me-1" />
                           +11.2%
                         </span>
                       </h3>
-                      <Link to="tasks.html" className="link-default">
+                      <Link to={routes.todo} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -473,13 +496,13 @@ const AdminDashboard = () => {
                         Earnings
                       </h6>
                       <h3 className="mb-3">
-                        $2144{" "}
+                        ${stats?.earnings?.toLocaleString() ?? "2,144"}{" "}
                         <span className="fs-12 fw-medium text-success">
                           <i className="fa-solid fa-caret-up me-1" />
                           +10.2%
                         </span>
                       </h3>
-                      <Link to="expenses.html" className="link-default">
+                      <Link to={routes.expenses} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -495,13 +518,13 @@ const AdminDashboard = () => {
                         Profit This Week
                       </h6>
                       <h3 className="mb-3">
-                        $5,544{" "}
+                        ${stats?.profit_this_week?.toLocaleString() ?? "5,544"}{" "}
                         <span className="fs-12 fw-medium text-success">
                           <i className="fa-solid fa-caret-up me-1" />
                           +2.1%
                         </span>
                       </h3>
-                      <Link to="purchase-transaction.html" className="link-default">
+                      <Link to={routes.payments} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -517,13 +540,13 @@ const AdminDashboard = () => {
                         Job Applicants
                       </h6>
                       <h3 className="mb-3">
-                        98{" "}
+                        {stats?.job_applicants ?? 98}{" "}
                         <span className="fs-12 fw-medium text-success">
                           <i className="fa-solid fa-caret-up me-1" />
                           +2.1%
                         </span>
                       </h3>
-                      <Link to="job-list.html" className="link-default">
+                      <Link to={routes.joblist} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -539,13 +562,13 @@ const AdminDashboard = () => {
                         New Hire
                       </h6>
                       <h3 className="mb-3">
-                        45/48{" "}
+                        {stats?.new_hires ?? 45}{" "}
                         <span className="fs-12 fw-medium text-danger">
                           <i className="fa-solid fa-caret-down me-1" />
                           -11.2%
                         </span>
                       </h3>
-                      <Link to="candidates.html" className="link-default">
+                      <Link to={routes.candidateslist} className="link-default">
                         View All
                       </Link>
                     </div>
@@ -653,123 +676,179 @@ const AdminDashboard = () => {
                 <div className="card-body">
                   <div className="d-flex align-items-center justify-content-between mb-1">
                     <p className="fs-13 mb-3">Total Employee</p>
-                    <h3 className="mb-3">154</h3>
+                    <h3 className="mb-3">{stats?.total_employees ?? 0}</h3>
                   </div>
-                  <div className="progress-stacked emp-stack mb-3">
-                    <div
-                      className="progress"
-                      role="progressbar"
-                      aria-label="Segment one"
-                      aria-valuenow={15}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      style={{ width: "40%" }}
-                    >
-                      <div className="progress-bar bg-warning" />
-                    </div>
-                    <div
-                      className="progress"
-                      role="progressbar"
-                      aria-label="Segment two"
-                      aria-valuenow={30}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      style={{ width: "20%" }}
-                    >
-                      <div className="progress-bar bg-secondary" />
-                    </div>
-                    <div
-                      className="progress"
-                      role="progressbar"
-                      aria-label="Segment three"
-                      aria-valuenow={20}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      style={{ width: "10%" }}
-                    >
-                      <div className="progress-bar bg-danger" />
-                    </div>
-                    <div
-                      className="progress"
-                      role="progressbar"
-                      aria-label="Segment four"
-                      aria-valuenow={20}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      style={{ width: "30%" }}
-                    >
-                      <div className="progress-bar bg-pink" />
-                    </div>
-                  </div>
-                  <div className="border mb-3">
-                    <div className="row gx-0">
-                      <div className="col-6">
-                        <div className="p-2 flex-fill border-end border-bottom">
-                          <p className="fs-13 mb-2">
-                            <i className="ti ti-square-filled text-primary fs-12 me-2" />
-                            Fulltime <span className="text-gray-9">(48%)</span>
-                          </p>
-                          <h2 className="display-1">112</h2>
+                  {(() => {
+                    const full = stats?.employment_types?.fulltime ?? 0;
+                    const contract = stats?.employment_types?.contract ?? 0;
+                    const probation = stats?.employment_types?.probation ?? 0;
+                    const wfh = stats?.employment_types?.wfh ?? 0;
+                    const totalType = (full + contract + probation + wfh) || 1;
+                    const fullPct = Math.round((full / totalType) * 100);
+                    const contractPct = Math.round((contract / totalType) * 100);
+                    const probationPct = Math.round((probation / totalType) * 100);
+                    const wfhPct = Math.round((wfh / totalType) * 100);
+                    return (
+                      <>
+                        <div className="progress-stacked emp-stack mb-3">
+                          <div
+                            className="progress"
+                            role="progressbar"
+                            aria-label="Segment one"
+                            aria-valuenow={fullPct}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            style={{ width: `${fullPct}%` }}
+                          >
+                            <div className="progress-bar bg-warning" />
+                          </div>
+                          <div
+                            className="progress"
+                            role="progressbar"
+                            aria-label="Segment two"
+                            aria-valuenow={contractPct}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            style={{ width: `${contractPct}%` }}
+                          >
+                            <div className="progress-bar bg-secondary" />
+                          </div>
+                          <div
+                            className="progress"
+                            role="progressbar"
+                            aria-label="Segment three"
+                            aria-valuenow={probationPct}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            style={{ width: `${probationPct}%` }}
+                          >
+                            <div className="progress-bar bg-danger" />
+                          </div>
+                          <div
+                            className="progress"
+                            role="progressbar"
+                            aria-label="Segment four"
+                            aria-valuenow={wfhPct}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            style={{ width: `${wfhPct}%` }}
+                          >
+                            <div className="progress-bar bg-pink" />
+                          </div>
                         </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="p-2 flex-fill border-bottom text-end">
-                          <p className="fs-13 mb-2">
-                            <i className="ti ti-square-filled me-2 text-secondary fs-12" />
-                            Contract <span className="text-gray-9">(20%)</span>
-                          </p>
-                          <h2 className="display-1">112</h2>
+                        <div className="border mb-3">
+                          <div className="row gx-0">
+                            <div className="col-6">
+                              <div className="p-2 flex-fill border-end border-bottom">
+                                <p className="fs-13 mb-2">
+                                  <i className="ti ti-square-filled text-primary fs-12 me-2" />
+                                  Fulltime <span className="text-gray-9">({fullPct}%)</span>
+                                </p>
+                                <h2 className="display-1">{full}</h2>
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="p-2 flex-fill border-bottom text-end">
+                                <p className="fs-13 mb-2">
+                                  <i className="ti ti-square-filled me-2 text-secondary fs-12" />
+                                  Contract <span className="text-gray-9">({contractPct}%)</span>
+                                </p>
+                                <h2 className="display-1">{contract}</h2>
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="p-2 flex-fill border-end">
+                                <p className="fs-13 mb-2">
+                                  <i className="ti ti-square-filled me-2 text-danger fs-12" />
+                                  Probation <span className="text-gray-9">({probationPct}%)</span>
+                                </p>
+                                <h2 className="display-1">{probation}</h2>
+                              </div>
+                            </div>
+                            <div className="col-6">
+                              <div className="p-2 flex-fill text-end">
+                                <p className="fs-13 mb-2">
+                                  <i className="ti ti-square-filled text-pink me-2 fs-12" />
+                                  WFH <span className="text-gray-9">({wfhPct}%)</span>
+                                </p>
+                                <h2 className="display-1">{wfh}</h2>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="p-2 flex-fill border-end">
-                          <p className="fs-13 mb-2">
-                            <i className="ti ti-square-filled me-2 text-danger fs-12" />
-                            Probation <span className="text-gray-9">(22%)</span>
-                          </p>
-                          <h2 className="display-1">12</h2>
-                        </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="p-2 flex-fill text-end">
-                          <p className="fs-13 mb-2">
-                            <i className="ti ti-square-filled text-pink me-2 fs-12" />
-                            WFH <span className="text-gray-9">(20%)</span>
-                          </p>
-                          <h2 className="display-1">04</h2>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                      </>
+                    );
+                  })()}
                   <h6 className="mb-2">Top Performer</h6>
-                  <div className="p-2 d-flex align-items-center justify-content-between border border-primary bg-primary-100 br-5 mb-4">
-                    <div className="d-flex align-items-center overflow-hidden">
-                      <span className="me-2">
-                        <i className="ti ti-award-filled text-primary fs-24" />
-                      </span>
-                      <Link
-                        to="employee-details.html"
-                        className="avatar avatar-md me-2"
-                      >
-                        <ImageWithBasePath
-                          src="assets/img/profiles/avatar-24.jpg"
-                          className="rounded-circle border border-white"
-                          alt="img"
-                        />
-                      </Link>
-                      <div>
-                        <h6 className="text-truncate mb-1 fs-14 fw-medium">
-                          <Link to="employee-details.html">Daniel Esbella</Link>
-                        </h6>
-                        <p className="fs-13">IOS Developer</p>
+                  {stats?.top_performer ? (
+                    <div className="p-2 d-flex align-items-center justify-content-between border border-primary bg-primary-100 br-5 mb-4">
+                      <div className="d-flex align-items-center overflow-hidden">
+                        <span className="me-2">
+                          <i className="ti ti-award-filled text-primary fs-24" />
+                        </span>
+                        <Link
+                          to={`${routes.employeeDetails}/${stats.top_performer.id}`}
+                          className="avatar avatar-md me-2"
+                        >
+                          {stats.top_performer.photo ? (
+                            <img
+                              src={stats.top_performer.photo}
+                              className="rounded-circle border border-white"
+                              alt="img"
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                          ) : (
+                            <ImageWithBasePath
+                              src="assets/img/profiles/avatar-24.jpg"
+                              className="rounded-circle border border-white"
+                              alt="img"
+                            />
+                          )}
+                        </Link>
+                        <div>
+                          <h6 className="text-truncate mb-1 fs-14 fw-medium">
+                            <Link to={`${routes.employeeDetails}/${stats.top_performer.id}`}>
+                              {stats.top_performer.full_name}
+                            </Link>
+                          </h6>
+                          <p className="fs-13">{stats.top_performer.designation}</p>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <p className="fs-13 mb-1">Performance</p>
+                        <h5 className="text-primary">{stats.top_performer.score}</h5>
                       </div>
                     </div>
-                    <div className="text-end">
-                      <p className="fs-13 mb-1">Performance</p>
-                      <h5 className="text-primary">99%</h5>
+                  ) : (
+                    <div className="p-2 d-flex align-items-center justify-content-between border border-primary bg-primary-100 br-5 mb-4">
+                      <div className="d-flex align-items-center overflow-hidden">
+                        <span className="me-2">
+                          <i className="ti ti-award-filled text-primary fs-24" />
+                        </span>
+                        <Link
+                          to={routes.employeeList}
+                          className="avatar avatar-md me-2"
+                        >
+                          <ImageWithBasePath
+                            src="assets/img/profiles/avatar-24.jpg"
+                            className="rounded-circle border border-white"
+                            alt="img"
+                          />
+                        </Link>
+                        <div>
+                          <h6 className="text-truncate mb-1 fs-14 fw-medium">
+                            <Link to={routes.employeeList}>Daniel Esbella</Link>
+                          </h6>
+                          <p className="fs-13">IOS Developer</p>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <p className="fs-13 mb-1">Performance</p>
+                        <h5 className="text-primary">99%</h5>
+                      </div>
                     </div>
-                  </div>
-                  <Link to="employees.html" className="btn btn-light btn-md w-100">
+                  )}
+                  <Link to={routes.employeeList} className="btn btn-light btn-md w-100">
                     View All Employees
                   </Link>
                 </div>
@@ -883,7 +962,7 @@ const AdminDashboard = () => {
                         </Link>
                       </div>
                     </div>
-                    <Link to="leaves.html"
+                    <Link to={routes.leaveadmin}
                       className="fs-13 link-primary text-decoration-underline mb-2"
                     >
                       View Details
@@ -1109,7 +1188,7 @@ const AdminDashboard = () => {
                       </span>
                     </div>
                   </div>
-                  <Link to="attendance-report.html"
+                  <Link to={routes.attendancereport}
                     className="btn btn-light btn-md w-100"
                   >
                     View All Attendance
@@ -1125,7 +1204,7 @@ const AdminDashboard = () => {
               <div className="card flex-fill">
                 <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
                   <h5 className="mb-2">Jobs Applicants</h5>
-                  <Link to="job-list.html" className="btn btn-light btn-md mb-2">
+                  <Link to={routes.joblist} className="btn btn-light btn-md mb-2">
                     View All
                   </Link>
                 </div>
@@ -1380,7 +1459,7 @@ const AdminDashboard = () => {
               <div className="card flex-fill">
                 <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
                   <h5 className="mb-2">Employees</h5>
-                  <Link to="employees.html" className="btn btn-light btn-md mb-2">
+                  <Link to={routes.employeeList} className="btn btn-light btn-md mb-2">
                     View All
                   </Link>
                 </div>
@@ -1570,90 +1649,27 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <div className="card-body">
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[0] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo1"
-                        onChange={() => toggleTodo(0)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo1">
-                        Add Holidays
-                      </label>
-                    </div>
-                  </div>
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[1] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo2"
-                        onChange={() => toggleTodo(1)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo2">
-                        Add Meeting to Client
-                      </label>
-                    </div>
-                  </div>
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[2] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo3"
-                        onChange={() => toggleTodo(2)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo3">
-                        Chat with Adrian
-                      </label>
-                    </div>
-                  </div>
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[3] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo4"
-                        onChange={() => toggleTodo(3)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo4">
-                        Management Call
-                      </label>
-                    </div>
-                  </div>
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[4] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo5"
-                        onChange={() => toggleTodo(4)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo5">
-                        Add Payroll
-                      </label>
-                    </div>
-                  </div>
-                  <div className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${isTodo[5] ? 'todo-strike' : ''}`}>
-                    <i className="ti ti-grid-dots me-2" />
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="todo6"
-                        onChange={() => toggleTodo(5)}
-                      />
-                      <label className="form-check-label fw-medium" htmlFor="todo6">
-                        Add Policy for Increment{" "}
-                      </label>
-                    </div>
-                  </div>
+                  {todos && todos.length > 0 ? (
+                    todos.map((todo: any, index: number) => (
+                      <div key={todo.id || index} className={`d-flex align-items-center todo-item border p-2 br-5 mb-2 ${todo.is_completed ? 'todo-strike' : ''}`}>
+                        <i className="ti ti-grid-dots me-2" />
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`todo-${todo.id}`}
+                            checked={todo.is_completed || false}
+                            onChange={() => handleToggleTodo(todo.id, todo.is_completed)}
+                          />
+                          <label className="form-check-label fw-medium" htmlFor={`todo-${todo.id}`}>
+                            {todo.title}
+                          </label>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted">No todos found</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1802,185 +1818,55 @@ const AdminDashboard = () => {
                   <div className="table-responsive pt-1">
                     <table className="table table-nowrap table-borderless mb-0">
                       <tbody>
-                        <tr>
-                          <td className="px-0">
-                            <div className="d-flex align-items-center">
-                              <Link to="invoice-details.html" className="avatar">
-                                <ImageWithBasePath
-                                  src="assets/img/users/user-39.jpg"
-                                  className="img-fluid rounded-circle"
-                                  alt="img"
-                                />
-                              </Link>
-                              <div className="ms-2">
-                                <h6 className="fw-medium">
-                                  <Link to="invoice-details.html">
-                                    Redesign Website
+                        {stats?.top_invoices && stats.top_invoices.length > 0 ? (
+                          stats.top_invoices.map((inv: any, index: number) => (
+                            <tr key={inv.id || index}>
+                              <td className="px-0">
+                                <div className="d-flex align-items-center">
+                                  <Link to={`${routes.invoices}`} className="avatar">
+                                    <ImageWithBasePath
+                                      src={`assets/img/users/user-${39 + (index % 10)}.jpg`}
+                                      className="img-fluid rounded-circle"
+                                      alt="img"
+                                    />
                                   </Link>
-                                </h6>
-                                <span className="fs-13 d-inline-flex align-items-center">
-                                  #INVOO2
-                                  <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
-                                  Logistics
+                                  <div className="ms-2">
+                                    <h6 className="fw-medium">
+                                      <Link to={`${routes.invoices}`}>
+                                        {inv.project_name}
+                                      </Link>
+                                    </h6>
+                                    <span className="fs-13 d-inline-flex align-items-center">
+                                      {inv.invoice_no}
+                                      <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
+                                      {inv.client_name}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <p className="fs-13 mb-1">Payment</p>
+                                <h6 className="fw-medium">${inv.amount}</h6>
+                              </td>
+                              <td className="px-0 text-end">
+                                <span className={`badge badge-${inv.status === 'Paid' ? 'success' : 'danger'}-transparent badge-xs d-inline-flex align-items-center`}>
+                                  <i className="ti ti-circle-filled fs-5 me-1" />
+                                  {inv.status}
                                 </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="fs-13 mb-1">Payment</p>
-                            <h6 className="fw-medium">$3560</h6>
-                          </td>
-                          <td className="px-0 text-end">
-                            <span className="badge badge-danger-transparent badge-xs d-inline-flex align-items-center">
-                              <i className="ti ti-circle-filled fs-5 me-1" />
-                              Unpaid
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-0">
-                            <div className="d-flex align-items-center">
-                              <Link to="invoice-details.html" className="avatar">
-                                <ImageWithBasePath
-                                  src="assets/img/users/user-40.jpg"
-                                  className="img-fluid rounded-circle"
-                                  alt="img"
-                                />
-                              </Link>
-                              <div className="ms-2">
-                                <h6 className="fw-medium">
-                                  <Link to="invoice-details.html">
-                                    Module Completion
-                                  </Link>
-                                </h6>
-                                <span className="fs-13 d-inline-flex align-items-center">
-                                  #INVOO5
-                                  <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
-                                  Yip Corp
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="fs-13 mb-1">Payment</p>
-                            <h6 className="fw-medium">$4175</h6>
-                          </td>
-                          <td className="px-0 text-end">
-                            <span className="badge badge-danger-transparent badge-xs d-inline-flex align-items-center">
-                              <i className="ti ti-circle-filled fs-5 me-1" />
-                              Unpaid
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-0">
-                            <div className="d-flex align-items-center">
-                              <Link to="invoice-details.html" className="avatar">
-                                <ImageWithBasePath
-                                  src="assets/img/users/user-55.jpg"
-                                  className="img-fluid rounded-circle"
-                                  alt="img"
-                                />
-                              </Link>
-                              <div className="ms-2">
-                                <h6 className="fw-medium">
-                                  <Link to="invoice-details.html">
-                                    Change on Emp Module
-                                  </Link>
-                                </h6>
-                                <span className="fs-13 d-inline-flex align-items-center">
-                                  #INVOO3
-                                  <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
-                                  Ignis LLP
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="fs-13 mb-1">Payment</p>
-                            <h6 className="fw-medium">$6985</h6>
-                          </td>
-                          <td className="px-0 text-end">
-                            <span className="badge badge-danger-transparent badge-xs d-inline-flex align-items-center">
-                              <i className="ti ti-circle-filled fs-5 me-1" />
-                              Unpaid
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-0">
-                            <div className="d-flex align-items-center">
-                              <Link to="invoice-details.html" className="avatar">
-                                <ImageWithBasePath
-                                  src="assets/img/users/user-42.jpg"
-                                  className="img-fluid rounded-circle"
-                                  alt="img"
-                                />
-                              </Link>
-                              <div className="ms-2">
-                                <h6 className="fw-medium">
-                                  <Link to="invoice-details.html">
-                                    Changes on the Board
-                                  </Link>
-                                </h6>
-                                <span className="fs-13 d-inline-flex align-items-center">
-                                  #INVOO2
-                                  <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
-                                  Ignis LLP
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="fs-13 mb-1">Payment</p>
-                            <h6 className="fw-medium">$1457</h6>
-                          </td>
-                          <td className="px-0 text-end">
-                            <span className="badge badge-danger-transparent badge-xs d-inline-flex align-items-center">
-                              <i className="ti ti-circle-filled fs-5 me-1" />
-                              Unpaid
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-0">
-                            <div className="d-flex align-items-center">
-                              <Link to="invoice-details.html" className="avatar">
-                                <ImageWithBasePath
-                                  src="assets/img/users/user-44.jpg"
-                                  className="img-fluid rounded-circle"
-                                  alt="img"
-                                />
-                              </Link>
-                              <div className="ms-2">
-                                <h6 className="fw-medium">
-                                  <Link to="invoice-details.html">
-                                    Hospital Management
-                                  </Link>
-                                </h6>
-                                <span className="fs-13 d-inline-flex align-items-center">
-                                  #INVOO6
-                                  <i className="ti ti-circle-filled fs-4 mx-1 text-primary" />
-                                  HCL Corp
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="fs-13 mb-1">Payment</p>
-                            <h6 className="fw-medium">$6458</h6>
-                          </td>
-                          <td className="px-0 text-end">
-                            <span className="badge badge-success-transparent badge-xs d-inline-flex align-items-center">
-                              <i className="ti ti-circle-filled fs-5 me-1" />
-                              Paid
-                            </span>
-                          </td>
-                        </tr>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="text-center py-3 text-muted">
+                              No invoices found
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
-                  <Link to="invoice.html"
+                  <Link to={routes.invoices}
                     className="btn btn-light btn-md w-100 mt-2"
                   >
                     View All
@@ -2046,443 +1932,91 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-001
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Office Management App
-                              </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-02.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-03.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-05.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">15/255 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={40}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "40%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>12/09/2024</td>
-                          <td>
-                            <span className="badge badge-danger d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              High
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-002
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">Clinic Management </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-06.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-07.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-08.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <Link
-                                className="avatar bg-primary avatar-rounded text-fixed-white fs-10 fw-medium"
-                                to="#"
-                              >
-                                +1
-                              </Link>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">15/255 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={40}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "40%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>24/10/2024</td>
-                          <td>
-                            <span className="badge badge-success d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              Low
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-003
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Educational Platform
-                              </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-06.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-08.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-09.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">40/255 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={50}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "50%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>18/02/2024</td>
-                          <td>
-                            <span className="badge badge-pink d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              Medium
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-004
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Chat &amp; Call Mobile App
-                              </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-11.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-12.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-13.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">35/155 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={50}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "50%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>19/02/2024</td>
-                          <td>
-                            <span className="badge badge-danger d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              High
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-005
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Travel Planning Website
-                              </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-17.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-18.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-19.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">50/235 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={50}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "50%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>18/02/2024</td>
-                          <td>
-                            <span className="badge badge-pink d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              Medium
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <Link to="project-details.html" className="link-default">
-                              PRO-006
-                            </Link>
-                          </td>
-                          <td>
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Service Booking Software
-                              </Link>
-                            </h6>
-                          </td>
-                          <td>
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-06.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-08.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-09.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <p className="mb-1">40/255 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={50}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "50%" }}
-                              />
-                            </div>
-                          </td>
-                          <td>20/02/2024</td>
-                          <td>
-                            <span className="badge badge-success d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              Low
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="border-0">
-                            <Link to="project-details.html" className="link-default">
-                              PRO-008
-                            </Link>
-                          </td>
-                          <td className="border-0">
-                            <h6 className="fw-medium">
-                              <Link to="project-details.html">
-                                Travel Planning Website
-                              </Link>
-                            </h6>
-                          </td>
-                          <td className="border-0">
-                            <div className="avatar-list-stacked avatar-group-sm">
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-15.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-16.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <span className="avatar avatar-rounded">
-                                <ImageWithBasePath
-                                  className="border border-white"
-                                  src="assets/img/profiles/avatar-17.jpg"
-                                  alt="img"
-                                />
-                              </span>
-                              <Link
-                                className="avatar bg-primary avatar-rounded text-fixed-white fs-10 fw-medium"
-                                to="#"
-                              >
-                                +2
-                              </Link>
-                            </div>
-                          </td>
-                          <td className="border-0">
-                            <p className="mb-1">15/255 Hrs</p>
-                            <div
-                              className="progress progress-xs w-100"
-                              role="progressbar"
-                              aria-valuenow={45}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div
-                                className="progress-bar bg-primary"
-                                style={{ width: "45%" }}
-                              />
-                            </div>
-                          </td>
-                          <td className="border-0">17/10/2024</td>
-                          <td className="border-0">
-                            <span className="badge badge-pink d-inline-flex align-items-center badge-xs">
-                              <i className="ti ti-point-filled me-1" />
-                              Medium
-                            </span>
-                          </td>
-                        </tr>
+                        {stats?.top_projects && stats.top_projects.length > 0 ? (
+                          stats.top_projects.map((proj: any, index: number) => {
+                            let progressPct = 40;
+                            if (proj.hours && proj.hours.includes('/')) {
+                              const parts = proj.hours.split('/');
+                              const spent = parseFloat(parts[0]);
+                              const total = parseFloat(parts[1]);
+                              if (total > 0) {
+                                progressPct = Math.round((spent / total) * 100);
+                              }
+                            }
+                            const priorityClass = proj.priority === 'High' ? 'danger' : proj.priority === 'Medium' ? 'pink' : 'success';
+                            const isLastRow = index === stats.top_projects.length - 1;
+                            const tdClass = isLastRow ? "border-0" : "";
+                            return (
+                              <tr key={proj.id || index}>
+                                <td className={tdClass}>
+                                  <Link to={`${routes.projectlist}`} className="link-default">
+                                    {proj.project_id}
+                                  </Link>
+                                </td>
+                                <td className={tdClass}>
+                                  <h6 className="fw-medium">
+                                    <Link to={`${routes.projectlist}`}>
+                                      {proj.project_name}
+                                    </Link>
+                                  </h6>
+                                </td>
+                                <td className={tdClass}>
+                                  <div className="avatar-list-stacked avatar-group-sm">
+                                    <span className="avatar avatar-rounded">
+                                      <ImageWithBasePath
+                                        className="border border-white"
+                                        src={`assets/img/profiles/avatar-0${2 + (index % 5)}.jpg`}
+                                        alt="img"
+                                      />
+                                    </span>
+                                    <span className="avatar avatar-rounded">
+                                      <ImageWithBasePath
+                                        className="border border-white"
+                                        src={`assets/img/profiles/avatar-0${3 + (index % 5)}.jpg`}
+                                        alt="img"
+                                      />
+                                    </span>
+                                    <span className="avatar avatar-rounded">
+                                      <ImageWithBasePath
+                                        className="border border-white"
+                                        src={`assets/img/profiles/avatar-0${5 + (index % 5)}.jpg`}
+                                        alt="img"
+                                      />
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className={tdClass}>
+                                  <p className="mb-1">{proj.hours}</p>
+                                  <div
+                                    className="progress progress-xs w-100"
+                                    role="progressbar"
+                                    aria-valuenow={progressPct}
+                                    aria-valuemin={0}
+                                    aria-valuemax={100}
+                                  >
+                                    <div
+                                      className="progress-bar bg-primary"
+                                      style={{ width: `${progressPct}%` }}
+                                    />
+                                  </div>
+                                </td>
+                                <td className={tdClass}>{proj.deadline}</td>
+                                <td className={tdClass}>
+                                  <span className={`badge badge-${priorityClass} d-inline-flex align-items-center badge-xs`}>
+                                    <i className="ti ti-point-filled me-1" />
+                                    {proj.priority}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="text-center py-3 text-muted">
+                              No projects found
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -2574,7 +2108,7 @@ const AdminDashboard = () => {
                       <h4 className="text-success">389/689 hrs</h4>
                       <p className="fs-13 mb-0">Spent on Overall Tasks This Week</p>
                     </div>
-                    <Link to="tasks.html"
+                    <Link to={routes.todo}
                       className="btn btn-sm btn-light mb-2 text-nowrap"
                     >
                       View All
@@ -2591,7 +2125,7 @@ const AdminDashboard = () => {
               <div className="card flex-fill">
                 <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
                   <h5 className="mb-2">Schedules</h5>
-                  <Link to="candidates.html" className="btn btn-light btn-md mb-2">
+                  <Link to={routes.candidateslist} className="btn btn-light btn-md mb-2">
                     View All
                   </Link>
                 </div>
@@ -2737,7 +2271,7 @@ const AdminDashboard = () => {
               <div className="card flex-fill">
                 <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
                   <h5 className="mb-2">Recent Activities</h5>
-                  <Link to="activity.html" className="btn btn-light btn-md mb-2">
+                  <Link to={routes.activity} className="btn btn-light btn-md mb-2">
                     View All
                   </Link>
                 </div>
