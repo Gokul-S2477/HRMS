@@ -303,8 +303,8 @@ const EmployeeDashboard: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      await refreshUser().catch(() => undefined);
-      const selfEmployeeId = user?.employee_profile?.id || employeeId;
+      const freshUser = await refreshUser().catch(() => undefined);
+      const selfEmployeeId = freshUser?.employee_profile?.id || user?.employee_profile?.id || employeeId;
       if (!selfEmployeeId) {
         setProfile(null);
         return;

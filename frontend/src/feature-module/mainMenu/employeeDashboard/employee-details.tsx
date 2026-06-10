@@ -120,7 +120,7 @@ type Employee = {
 const EmployeeDetails: React.FC = () => {
   const { id: idParam } = useParams();
   const queryId = new URLSearchParams(useLocation().search).get("id");
-  const { user, role } = useAuth();
+  const { user, role, refreshUser } = useAuth();
   const employeeId =
     idParam || queryId || (user?.employee_profile?.id ? String(user.employee_profile.id) : "");
   const navigate = useNavigate();
@@ -133,6 +133,7 @@ const EmployeeDetails: React.FC = () => {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userRefreshing, setUserRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [editSection, setEditSection] = useState<
@@ -234,6 +235,15 @@ const EmployeeDetails: React.FC = () => {
   useEffect(() => {
     loadEmployeeList();
   }, [loadEmployeeList]);
+
+  useEffect(() => {
+    if (!employeeId && role === "employee") {
+      setUserRefreshing(true);
+      refreshUser()
+        .catch(() => undefined)
+        .finally(() => setUserRefreshing(false));
+    }
+  }, [employeeId, role, refreshUser]);
 
   useEffect(() => {
     if (employeeId) {
@@ -518,6 +528,19 @@ const EmployeeDetails: React.FC = () => {
       ))}
     </div>
   );
+
+  if (userRefreshing) {
+    return (
+      <div className="page-wrapper d-flex align-items-center justify-content-center" style={{ minHeight: "80vh" }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">Loading Profile...</span>
+          </div>
+          <p className="mt-3 text-muted">Refreshing employee login credentials...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!employeeId) {
     return (
