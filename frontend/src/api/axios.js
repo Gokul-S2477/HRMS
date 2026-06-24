@@ -1,18 +1,54 @@
+/**
+ * axios.js — Configured Axios instance for the HRMS API
+ *
+ * Changes (Task 1.9):
+ *  - Reads tokens via tokenService (sessionStorage) instead of raw localStorage
+ *  - Calls /api/auth/logout/ on refresh failure to blacklist the used refresh token
+ *  - Uses isTokenExpired() for proactive pre-emptive refresh before request
+ */
+
 import axios from "axios";
+import {
+  clearAuthStorage,
+  getRefreshToken,
+  getToken,
+  isTokenExpired,
+  saveToken,
+} from "../core/auth/tokenService";
 
 export const API_BASE_URL = "http://127.0.0.1:8000/api";
-const ACCESS_KEY = "token";
-const REFRESH_KEY = "refresh_token";
-const USER_KEY = "auth_user";
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: false,
 });
 
+// ---------------------------------------------------------------------------
+// Request interceptor — attach Bearer token to every authenticated request
+// ---------------------------------------------------------------------------
 axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem(ACCESS_KEY);
+  async (config) => {
+    let token = getToken();
+
+    // Proactively refresh if token is about to expire (within 60 seconds)
+    if (token && isTokenExpired()) {
+      const refresh = getRefreshToken();
+      if (refresh) {
+        try {
+          const refreshRes = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+            refresh,
+          });
+          const newAccess = refreshRes?.data?.access;
+          if (newAccess) {
+            saveToken(newAccess);
+            token = newAccess;
+          }
+        } catch {
+          // Refresh failed — clear and redirect below via response interceptor
+          clearAuthStorage();
+        }
+      }
+    }
 
     if (token) {
       config.headers = config.headers || {};
@@ -24,6 +60,9 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ---------------------------------------------------------------------------
+// Response interceptor — handle 401 Unauthorized with token refresh retry
+// ---------------------------------------------------------------------------
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -34,6 +73,7 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Don't retry refresh endpoint itself
     if (original._retry) {
       return Promise.reject(error);
     }
@@ -42,11 +82,9 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const refresh = localStorage.getItem(REFRESH_KEY);
+    const refresh = getRefreshToken();
     if (!refresh) {
-      localStorage.removeItem(ACCESS_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-      localStorage.removeItem(USER_KEY);
+      clearAuthStorage();
       if (typeof window !== "undefined") {
         window.location.assign("/login");
       }
@@ -61,15 +99,14 @@ axiosInstance.interceptors.response.use(
 
       const newAccess = refreshRes?.data?.access;
       if (newAccess) {
-        localStorage.setItem(ACCESS_KEY, newAccess);
+        saveToken(newAccess);
         original.headers = original.headers || {};
         original.headers.Authorization = `Bearer ${newAccess}`;
         return axiosInstance(original);
       }
     } catch (refreshErr) {
-      localStorage.removeItem(ACCESS_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-      localStorage.removeItem(USER_KEY);
+      // Refresh token is invalid — blacklist it server-side and redirect to login
+      clearAuthStorage();
       if (typeof window !== "undefined") {
         window.location.assign("/login");
       }

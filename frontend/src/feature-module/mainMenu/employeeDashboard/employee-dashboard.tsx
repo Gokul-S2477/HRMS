@@ -238,7 +238,7 @@ const EmployeeDashboard: React.FC = () => {
         latitude: coords?.latitude || null,
         longitude: coords?.longitude || null,
       };
-      await API.post("/data/attendance-employee/", { data: payload });
+      await API.post("/attendance-records/", { data: payload });
       loadData();
     } catch (error: any) {
       console.error("Failed to clock in", error);
@@ -255,7 +255,7 @@ const EmployeeDashboard: React.FC = () => {
       const payload = {
         action: "break_start",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadData();
     } catch (error) {
       console.error("Failed to start break", error);
@@ -272,7 +272,7 @@ const EmployeeDashboard: React.FC = () => {
       const payload = {
         action: "break_end",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadData();
     } catch (error) {
       console.error("Failed to end break", error);
@@ -290,7 +290,7 @@ const EmployeeDashboard: React.FC = () => {
       const payload = {
         check_out: "force_server_time",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadData();
     } catch (error) {
       console.error("Failed to clock out", error);
@@ -316,7 +316,7 @@ const EmployeeDashboard: React.FC = () => {
       const [profileRes, payrollRes, attendanceRes, leaveRes, ticketRes, trainingRes, leaveBalanceRes, policiesRes] = await Promise.all([
         API.get(`/employees/${selfEmployeeId}/`),
         API.get("/employee-payroll/"),
-        API.get("/data/attendance-employee/"),
+        API.get(`/attendance-records/?employee_id=${selfEmployeeId}`),
         API.get("/data/leave-employee/"),
         API.get("/data/tickets/"),
         API.get("/data/training-sessions/"),

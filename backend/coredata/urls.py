@@ -20,6 +20,8 @@ from .workflow_views import (
     AuditLogViewSet,
     DocumentCategoryViewSet,
     EmployeeDocumentViewSet,
+    EmployeeDocumentUploadView,
+    AttendanceRecordViewSet,
     LeaveBalanceViewSet,
     LeaveLedgerViewSet,
     NotificationViewSet,
@@ -41,6 +43,19 @@ from .workflow_views import (
     ExpenseClaimViewSet,
     DocumentEsignViewSet,
     DocumentSignatureViewSet,
+    SalaryRevisionViewSet,
+    EmployeeTransferViewSet,
+    EmployeeLoanViewSet,
+    LoanInstallmentViewSet,
+    TrainingProgramViewSet,
+    TrainingEnrollmentViewSet,
+    ReviewCycleViewSet,
+    PerformanceReviewViewSet,
+    ReviewGoalViewSet,
+    ReviewFeedbackViewSet,
+    PeerFeedbackViewSet,
+    AnnouncementViewSet,
+    DisciplinaryActionViewSet,
 )
 
 router = DefaultRouter()
@@ -69,8 +84,23 @@ router.register(r"productivity/todos", ProductivityTodoViewSet, basename="produc
 router.register(r"productivity/events", ReminderEventViewSet, basename="productivity-events")
 router.register(r"esign-documents", DocumentEsignViewSet, basename="esign-documents")
 router.register(r"esign-signatures", DocumentSignatureViewSet, basename="esign-signatures")
+router.register(r"attendance-records", AttendanceRecordViewSet, basename="attendance-records")
+router.register(r"salary-revisions", SalaryRevisionViewSet, basename="salary-revisions")
+router.register(r"employee-transfers", EmployeeTransferViewSet, basename="employee-transfers")
+router.register(r"employee-loans", EmployeeLoanViewSet, basename="employee-loans")
+router.register(r"loan-installments", LoanInstallmentViewSet, basename="loan-installments")
+router.register(r"training-programs", TrainingProgramViewSet, basename="training-programs")
+router.register(r"training-enrollments", TrainingEnrollmentViewSet, basename="training-enrollments")
+router.register(r"review-cycles", ReviewCycleViewSet, basename="review-cycles")
+router.register(r"performance-reviews", PerformanceReviewViewSet, basename="performance-reviews")
+router.register(r"review-goals", ReviewGoalViewSet, basename="review-goals")
+router.register(r"review-feedbacks", ReviewFeedbackViewSet, basename="review-feedbacks")
+router.register(r"peer-feedbacks", PeerFeedbackViewSet, basename="peer-feedbacks")
+router.register(r"announcements", AnnouncementViewSet, basename="announcements")
+router.register(r"disciplinary-actions", DisciplinaryActionViewSet, basename="disciplinary-actions")
 
 urlpatterns = [
+    path("employee-documents/upload/", EmployeeDocumentUploadView.as_view(), name="employee-document-upload"),
     path("public/jobs/", PublicRecruitmentJobsView.as_view(), name="public-jobs"),
     path("public/jobs/<int:pk>/<slug:slug>/", PublicRecruitmentJobDetailView.as_view(), name="public-job-detail"),
     path("public/jobs/<int:pk>/<slug:slug>/apply/", PublicJobApplyView.as_view(), name="public-job-apply"),

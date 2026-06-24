@@ -78,7 +78,11 @@ const Login = () => {
 
     try {
       const user = await login(username, password);
-      navigate(getHomeRouteForRole(user?.effective_role || user?.role), { replace: true });
+      if (user?.must_change_password) {
+        navigate("/change-password", { replace: true });
+      } else {
+        navigate(getHomeRouteForRole(user?.effective_role || user?.role), { replace: true });
+      }
     } catch (error: any) {
       const detail =
         error?.response?.data?.detail ||

@@ -104,6 +104,28 @@ class Employee(models.Model):
     salary = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
+    # Probation tracking fields (Task 4.6)
+    probation_period_months = models.IntegerField(default=6)
+    probation_status = models.CharField(
+        max_length=30,
+        choices=[
+            ("on_probation", "On Probation"),
+            ("confirmed", "Confirmed"),
+            ("extended", "Extended"),
+            ("terminated", "Terminated")
+        ],
+        default="on_probation"
+    )
+    probation_end_date = models.DateField(blank=True, null=True)
+    confirmed_on = models.DateField(blank=True, null=True)
+    confirmed_by = models.ForeignKey(
+        "users.CustomUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_probations"
+    )
+
     permissions = models.JSONField(default=dict, blank=True)
 
     # Extended profile sections (used in Employee Details)
@@ -123,6 +145,22 @@ class Employee(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate probation end date if not set and joining_date exists
+        if not self.probation_end_date and self.joining_date:
+            import datetime
+            try:
+                months = self.probation_period_months or 6
+                year = self.joining_date.year + (self.joining_date.month + months - 1) // 12
+                month = (self.joining_date.month + months - 1) % 12 + 1
+                # Handle end of month days safely
+                days_in_month = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+                day = min(self.joining_date.day, days_in_month[month-1])
+                self.probation_end_date = datetime.date(year, month, day)
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         last = f" {self.last_name}" if self.last_name else ""
@@ -147,3 +185,64 @@ class Policy(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class SalaryRevision(models.Model):
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("approved", "Approved"),
+    ]
+    REVISION_TYPE_CHOICES = [
+        ("increment", "Increment"),
+        ("promotion", "Promotion"),
+        ("correction", "Correction"),
+        ("joining", "Joining"),
+    ]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salary_revisions")
+    revised_by = models.ForeignKey("users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="revised_salaries")
+    effective_date = models.DateField()
+    previous_salary = models.DecimalField(max_digits=12, decimal_places=2)
+    new_salary = models.DecimalField(max_digits=12, decimal_places=2)
+    revision_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    reason = models.TextField(blank=True, null=True)
+    revision_type = models.CharField(max_length=30, choices=REVISION_TYPE_CHOICES, default="increment")
+    approved_by = models.ForeignKey("users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_salary_revisions")
+    approved_at = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-effective_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.previous_salary} -> {self.new_salary}"
+
+
+class EmployeeTransfer(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="transfers")
+    from_department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_from")
+    to_department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_to")
+    from_designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_from")
+    to_designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_to")
+    from_reporting_to = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_reporting_from")
+    to_reporting_to = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_reporting_to")
+    effective_date = models.DateField()
+    reason = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    approved_by = models.ForeignKey("users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_transfers")
+    approved_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-effective_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"Transfer of {self.employee.first_name} to {self.to_department}"

@@ -167,6 +167,57 @@ const AdminDashboard = () => {
     }
   }, [stats]);
 
+  // Headcount Trend Area Chart
+  const [headcountTrend, setHeadcountTrend] = useState<any>({
+    chart: {
+      height: 290,
+      type: 'area',
+      toolbar: { show: false }
+    },
+    colors: ['#03C95A'],
+    stroke: {
+      curve: 'smooth',
+      width: 3
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.1,
+        stops: [0, 90, 100]
+      }
+    },
+    grid: {
+      borderColor: '#E5E7EB',
+      strokeDashArray: 5,
+      padding: { left: -8, right: 8 }
+    },
+    dataLabels: { enabled: false },
+    series: [{ name: 'Headcount', data: [] }],
+    xaxis: {
+      categories: [],
+      labels: { style: { colors: '#6B7280', fontSize: '13px' } }
+    },
+    yaxis: {
+      labels: { offsetX: -15, style: { colors: '#6B7280', fontSize: '13px' } }
+    }
+  });
+
+  useEffect(() => {
+    if (stats && stats.headcount_trend) {
+      setHeadcountTrend((prev: any) => ({
+        ...prev,
+        series: [{ name: 'Headcount', data: stats.headcount_trend.counts }],
+        xaxis: {
+          ...prev.xaxis,
+          categories: stats.headcount_trend.labels
+        }
+      }));
+    }
+  }, [stats]);
+
+
   // 3. Attendance Donut chart (PrimeReact)
   const [chartData, setChartData] = useState({});
   const [chartOptions, setChartOptions] = useState({});
@@ -2450,121 +2501,116 @@ const AdminDashboard = () => {
             <div className="col-xxl-4 col-xl-6 d-flex">
               <div className="card flex-fill">
                 <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
-                  <h5 className="mb-2">Birthdays</h5>
-                  <Link to="#"
+                  <h5 className="mb-2">Birthdays This Week</h5>
+                  <Link to={routes.employeeList}
                     className="btn btn-light btn-md mb-2"
                   >
                     View All
                   </Link>
                 </div>
-                <div className="card-body pb-1">
-                  <h6 className="mb-2">Today</h6>
-                  <div className="bg-light p-2 border border-dashed rounded-top mb-3">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center">
-                        <Link to="#" className="avatar">
-                          <ImageWithBasePath
-                            src="assets/img/users/user-38.jpg"
-                            className="rounded-circle"
-                            alt="img"
-                          />
-                        </Link>
-                        <div className="ms-2 overflow-hidden">
-                          <h6 className="fs-medium ">Andrew Jermia</h6>
-                          <p className="fs-13">IOS Developer</p>
+                <div className="card-body pb-1" style={{ maxHeight: "330px", overflowY: "auto" }}>
+                  {stats?.birthdays_this_week && stats.birthdays_this_week.length > 0 ? (
+                    stats.birthdays_this_week.map((bday: any, index: number) => (
+                      <div key={bday.id || index} className="bg-light p-2 border border-dashed rounded-top mb-3">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center">
+                            <span className="avatar">
+                              <ImageWithBasePath
+                                src={`assets/img/users/user-${10 + (index % 10)}.jpg`}
+                                className="rounded-circle"
+                                alt="img"
+                              />
+                            </span>
+                            <div className="ms-2 overflow-hidden">
+                              <h6 className="fs-medium mb-1">
+                                <Link to={routes.employeeDetailsView.replace(":id", String(bday.id))}>
+                                  {bday.name}
+                                </Link>
+                              </h6>
+                              <p className="fs-13 text-muted mb-0">{bday.birthday}</p>
+                            </div>
+                          </div>
+                          <Link
+                            to="#"
+                            className="btn btn-secondary btn-xs"
+                          >
+                            <i className="ti ti-cake me-1" />
+                            Send
+                          </Link>
                         </div>
                       </div>
-                      <Link
-                        to="#"
-                        className="btn btn-secondary btn-xs"
-                      >
-                        <i className="ti ti-cake me-1" />
-                        Send
-                      </Link>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted">
+                      <i className="ti ti-cake text-primary fs-32 mb-2" />
+                      <p className="mb-0">No birthdays this week.</p>
                     </div>
-                  </div>
-                  <h6 className="mb-2">Tomorow</h6>
-                  <div className="bg-light p-2 border border-dashed rounded-top mb-3">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center">
-                        <Link to="#" className="avatar">
-                          <ImageWithBasePath
-                            src="assets/img/users/user-10.jpg"
-                            className="rounded-circle"
-                            alt="img"
-                          />
-                        </Link>
-                        <div className="ms-2 overflow-hidden">
-                          <h6 className="fs-medium">
-                            <Link to="#">Mary Zeen</Link>
-                          </h6>
-                          <p className="fs-13">UI/UX Designer</p>
-                        </div>
-                      </div>
-                      <Link
-                        to="#"
-                        className="btn btn-secondary btn-xs"
-                      >
-                        <i className="ti ti-cake me-1" />
-                        Send
-                      </Link>
-                    </div>
-                  </div>
-                  <div className="bg-light p-2 border border-dashed rounded-top mb-3">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center">
-                        <Link to="#" className="avatar">
-                          <ImageWithBasePath
-                            src="assets/img/users/user-09.jpg"
-                            className="rounded-circle"
-                            alt="img"
-                          />
-                        </Link>
-                        <div className="ms-2 overflow-hidden">
-                          <h6 className="fs-medium ">
-                            <Link to="#">Antony Lewis</Link>
-                          </h6>
-                          <p className="fs-13">Android Developer</p>
-                        </div>
-                      </div>
-                      <Link
-                        to="#"
-                        className="btn btn-secondary btn-xs"
-                      >
-                        <i className="ti ti-cake me-1" />
-                        Send
-                      </Link>
-                    </div>
-                  </div>
-                  <h6 className="mb-2">25 Jan 2025</h6>
-                  <div className="bg-light p-2 border border-dashed rounded-top mb-3">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div className="d-flex align-items-center">
-                        <span className="avatar">
-                          <ImageWithBasePath
-                            src="assets/img/users/user-12.jpg"
-                            className="rounded-circle"
-                            alt="img"
-                          />
-                        </span>
-                        <div className="ms-2 overflow-hidden">
-                          <h6 className="fs-medium ">Doglas Martini</h6>
-                          <p className="fs-13">.Net Developer</p>
-                        </div>
-                      </div>
-                      <Link
-                        to="#"
-                        className="btn btn-secondary btn-xs"
-                      >
-                        <i className="ti ti-cake me-1" />
-                        Send
-                      </Link>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
             {/* /Birthdays */}
+          </div>
+
+          <div className="row">
+            {/* Headcount Growth Trend Chart */}
+            <div className="col-xxl-8 col-xl-7 d-flex">
+              <div className="card flex-fill">
+                <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
+                  <h5 className="mb-2">Headcount Growth Trend</h5>
+                  <span className="fs-12 text-muted">Last 6 Months Headcount</span>
+                </div>
+                <div className="card-body">
+                  <ReactApexChart
+                    id="headcount-trend"
+                    options={headcountTrend}
+                    series={headcountTrend.series}
+                    type="area"
+                    height={290}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Probation Alerts */}
+            <div className="col-xxl-4 col-xl-5 d-flex">
+              <div className="card flex-fill">
+                <div className="card-header pb-2 d-flex align-items-center justify-content-between flex-wrap">
+                  <h5 className="mb-2">Probation Reviews Due</h5>
+                  <Link to={routes.employeeList} className="btn btn-light btn-md mb-2">
+                    View Employees
+                  </Link>
+                </div>
+                <div className="card-body pb-1" style={{ maxHeight: "330px", overflowY: "auto" }}>
+                  {stats?.probation_alerts && stats.probation_alerts.length > 0 ? (
+                    stats.probation_alerts.map((alert: any, index: number) => (
+                      <div key={alert.id || index} className="p-3 border border-dashed rounded mb-3 d-flex align-items-center justify-content-between" style={{ borderColor: '#FFC107' }}>
+                        <div className="d-flex align-items-center">
+                          <span className="avatar avatar-md bg-warning-transparent rounded-circle me-2 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(255, 193, 7, 0.15)', color: '#FFC107', width: '40px', height: '40px' }}>
+                            <i className="ti ti-alert-triangle fs-18" />
+                          </span>
+                          <div>
+                            <h6 className="fs-14 fw-medium text-default mb-1">
+                              <Link to={routes.employeeDetailsView.replace(":id", String(alert.id))}>
+                                {alert.name}
+                              </Link>
+                            </h6>
+                            <p className="fs-12 text-muted mb-0">Emp Code: {alert.emp_code} | Due: {alert.probation_end_date}</p>
+                          </div>
+                        </div>
+                        <Link to={routes.employeeDetailsView.replace(":id", String(alert.id))} className="btn btn-warning btn-xs text-white">
+                          Confirm
+                        </Link>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-5 text-muted">
+                      <i className="ti ti-circle-check text-success fs-32 mb-2" />
+                      <p className="mb-0">All employees confirmed. No pending probation reviews.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">

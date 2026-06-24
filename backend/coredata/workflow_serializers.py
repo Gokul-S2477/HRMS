@@ -4,7 +4,8 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from employees.models import Department, Employee
+from employees.models import Department, Employee, SalaryRevision, EmployeeTransfer
+from payroll.models import EmployeeLoan, LoanInstallment
 
 from .models import (
     ApplicantAccount,
@@ -35,6 +36,16 @@ from .models import (
     ExpenseClaim,
     DocumentEsign,
     DocumentSignature,
+    AttendanceRecord,
+    TrainingProgram,
+    TrainingEnrollment,
+    ReviewCycle,
+    PerformanceReview,
+    ReviewGoal,
+    ReviewFeedback,
+    PeerFeedback,
+    Announcement,
+    DisciplinaryAction,
 )
 
 User = get_user_model()
@@ -1229,3 +1240,208 @@ class DocumentEsignSerializer(serializers.ModelSerializer):
             "signatures",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+
+class AttendanceRecordSerializer(serializers.ModelSerializer):
+    employee = EmployeeMiniSerializer(read_only=True)
+    employee_id = serializers.PrimaryKeyRelatedField(
+        source="employee",
+        queryset=Employee.objects.all(),
+        write_only=True,
+        required=False,
+    )
+    data = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AttendanceRecord
+        fields = [
+            "id",
+            "employee",
+            "employee_id",
+            "work_date",
+            "check_in_time",
+            "check_out_time",
+            "check_in_lat",
+            "check_in_lng",
+            "check_out_lat",
+            "check_out_lng",
+            "check_in_ip",
+            "check_out_ip",
+            "check_in_method",
+            "status",
+            "total_hours",
+            "break_hours",
+            "on_break",
+            "breaks",
+            "work_mode",
+            "shift",
+            "punctuality",
+            "discrepancy",
+            "discrepancy_reasons",
+            "is_regularized",
+            "notes",
+            "data",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at", "employee"]
+
+    def get_data(self, obj):
+        return {
+            "employee_id": obj.employee_id,
+            "employee_name": f"{obj.employee.first_name} {obj.employee.last_name or ''}".strip(),
+            "department": obj.employee.department.name if obj.employee.department else "",
+            "designation": obj.employee.designation.title if obj.employee.designation else "",
+            "date": obj.work_date.isoformat() if obj.work_date else "",
+            "status": obj.status,
+            "check_in": obj.check_in_time.strftime("%H:%M") if obj.check_in_time else "",
+            "check_out": obj.check_out_time.strftime("%H:%M") if obj.check_out_time else "",
+            "shift": obj.shift,
+            "work_mode": obj.work_mode,
+            "remarks": obj.notes,
+            "work_hours": float(obj.total_hours),
+            "break_hours": float(obj.break_hours),
+            "on_break": obj.on_break,
+            "breaks": obj.breaks,
+            "punctuality": obj.punctuality,
+            "discrepancy": obj.discrepancy,
+            "discrepancy_reasons": obj.discrepancy_reasons,
+            "ip_address": obj.check_in_ip,
+            "ip_address_out": obj.check_out_ip,
+            "latitude": float(obj.check_in_lat) if obj.check_in_lat else None,
+            "longitude": float(obj.check_in_lng) if obj.check_in_lng else None,
+        }
+
+
+class SalaryRevisionSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    revised_by_name = serializers.ReadOnlyField(source="revised_by.username")
+    approved_by_name = serializers.ReadOnlyField(source="approved_by.username")
+
+    class Meta:
+        model = SalaryRevision
+        fields = "__all__"
+
+
+class EmployeeTransferSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    from_department_name = serializers.ReadOnlyField(source="from_department.name")
+    to_department_name = serializers.ReadOnlyField(source="to_department.name")
+    from_designation_title = serializers.ReadOnlyField(source="from_designation.title")
+    to_designation_title = serializers.ReadOnlyField(source="to_designation.title")
+
+    class Meta:
+        model = EmployeeTransfer
+        fields = "__all__"
+
+
+class LoanInstallmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LoanInstallment
+        fields = "__all__"
+
+
+class EmployeeLoanSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    approved_by_name = serializers.ReadOnlyField(source="approved_by.username")
+    installments = LoanInstallmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = EmployeeLoan
+        fields = "__all__"
+
+
+class TrainingProgramSerializer(serializers.ModelSerializer):
+    department_name = serializers.ReadOnlyField(source="department.name")
+    enrollment_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrainingProgram
+        fields = "__all__"
+
+    def get_enrollment_count(self, obj):
+        return obj.enrollments.count()
+
+
+class TrainingEnrollmentSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    program_title = serializers.ReadOnlyField(source="program.title")
+
+    class Meta:
+        model = TrainingEnrollment
+        fields = "__all__"
+
+
+class ReviewGoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewGoal
+        fields = "__all__"
+
+
+class ReviewFeedbackSerializer(serializers.ModelSerializer):
+    from_user_name = serializers.ReadOnlyField(source="from_user.username")
+
+    class Meta:
+        model = ReviewFeedback
+        fields = "__all__"
+
+
+class PerformanceReviewSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    reviewer_name = serializers.ReadOnlyField(source="reviewer.first_name")
+    cycle_name = serializers.ReadOnlyField(source="cycle.name")
+    goals = ReviewGoalSerializer(many=True, read_only=True)
+    feedbacks = ReviewFeedbackSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PerformanceReview
+        fields = "__all__"
+
+
+class ReviewCycleSerializer(serializers.ModelSerializer):
+    review_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewCycle
+        fields = "__all__"
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
+
+
+class PeerFeedbackSerializer(serializers.ModelSerializer):
+    reviewer_name = serializers.SerializerMethodField()
+    reviewee_name = serializers.ReadOnlyField(source="reviewee.first_name")
+    cycle_name = serializers.ReadOnlyField(source="cycle.name")
+
+    class Meta:
+        model = PeerFeedback
+        fields = "__all__"
+
+    def get_reviewer_name(self, obj):
+        if obj.anonymous:
+            return "Anonymous Peer"
+        return obj.reviewer.first_name
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    author_name = serializers.ReadOnlyField(source="author.username")
+    read_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Announcement
+        fields = "__all__"
+
+    def get_read_count(self, obj):
+        return obj.read_by.count()
+
+
+class DisciplinaryActionSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source="employee.first_name")
+    issued_by_name = serializers.ReadOnlyField(source="issued_by.username")
+
+    class Meta:
+        model = DisciplinaryAction
+        fields = "__all__"
+
+

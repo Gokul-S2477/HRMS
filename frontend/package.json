@@ -28,6 +28,7 @@
     "clipboard-copy": "^4.0.1",
     "dragula": "^3.7.3",
     "feather-icons-react": "^0.7.0",
+    "html2canvas": "^1.4.1",
     "jquery": "^3.7.1",
     "leaflet": "^1.9.4",
     "moment": "^2.30.1",

@@ -5,6 +5,7 @@ import {
   clearAuthStorage,
   getStoredUser,
   getToken,
+  getRefreshToken,
   saveAuthSession,
   saveAuthUser,
 } from "./auth";
@@ -68,6 +69,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Blacklist the refresh token server-side (Task 1.3)
+    const refresh = getRefreshToken();
+    if (refresh) {
+      API.post("/auth/logout/", { refresh }).catch(() => {
+        // Silently ignore — we still clear local storage even if the call fails
+      });
+    }
     clearAuthStorage();
     setUser(null);
     if (typeof window !== "undefined") {

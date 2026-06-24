@@ -27,7 +27,7 @@ MONTH_LOOKUP = {
     "december": 12,
 }
 
-PAYROLL_CURRENCY = "USD"
+PAYROLL_CURRENCY = "INR"  # Indian Rupee — Palepu Pharma operates in India
 
 
 def as_decimal(value) -> Decimal:

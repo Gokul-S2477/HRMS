@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import html2canvas from "html2canvas";
 import API from "../../api/axios";
 import { useAuth } from "../../core/auth/AuthContext";
 import CollapseHeader from "../../core/common/collapse-header/collapse-header";
@@ -203,6 +204,7 @@ const OrgChartWorkspace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<OrgNode | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
   const [expandedNodes, setExpandedNodes] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
@@ -235,12 +237,83 @@ const OrgChartWorkspace: React.FC = () => {
     return map;
   }, [treeData]);
 
+  // Unique departments for filter
+  const departmentsList = useMemo(() => {
+    const depts = new Set<string>();
+    Object.values(flatNodes).forEach((node) => {
+      if (node.department) {
+        depts.add(node.department);
+      }
+    });
+    return Array.from(depts).sort();
+  }, [flatNodes]);
+
+  // Bypasses non-department nodes to connect department nodes in a contiguous tree
+  const buildDeptOnlyTree = (flatNodesList: OrgNode[], selectedDept: string): OrgNode[] => {
+    const deptNodes = flatNodesList.filter(n => n.department === selectedDept);
+    const deptNodeIds = new Set(deptNodes.map(n => n.id));
+
+    const clonedNodesMap: Record<number, OrgNode> = {};
+    deptNodes.forEach(node => {
+      clonedNodesMap[node.id] = {
+        ...node,
+        children: []
+      };
+    });
+
+    const roots: OrgNode[] = [];
+
+    deptNodes.forEach(node => {
+      let parentInDept: OrgNode | null = null;
+      let currentParentId = node.reporting_to_id;
+
+      while (currentParentId) {
+        if (deptNodeIds.has(currentParentId)) {
+          parentInDept = clonedNodesMap[currentParentId];
+          break;
+        }
+        const parentNode = flatNodes[currentParentId];
+        currentParentId = parentNode ? parentNode.reporting_to_id : null;
+      }
+
+      const clonedNode = clonedNodesMap[node.id];
+      if (parentInDept) {
+        parentInDept.children.push(clonedNode);
+      } else {
+        roots.push(clonedNode);
+      }
+    });
+
+    return roots;
+  };
+
+  const filteredTreeData = useMemo(() => {
+    if (!selectedDepartment) return treeData;
+    const flatNodesList = Object.values(flatNodes);
+    return buildDeptOnlyTree(flatNodesList, selectedDepartment);
+  }, [selectedDepartment, treeData, flatNodes]);
+
+  // Flat list of nodes in the filtered tree
+  const filteredFlatNodes = useMemo(() => {
+    const map: Record<number, OrgNode> = {};
+    const traverse = (nodes: OrgNode[]) => {
+      nodes.forEach((node) => {
+        map[node.id] = node;
+        if (node.children && node.children.length > 0) {
+          traverse(node.children);
+        }
+      });
+    };
+    traverse(filteredTreeData);
+    return map;
+  }, [filteredTreeData]);
+
   // Find paths to highlighted nodes to auto-expand them
   const searchMatchedIds = useMemo(() => {
     if (!searchQuery.trim()) return new Set<number>();
     const query = searchQuery.toLowerCase();
     const matches = new Set<number>();
-    Object.values(flatNodes).forEach((node) => {
+    Object.values(filteredFlatNodes).forEach((node) => {
       if (
         node.full_name.toLowerCase().includes(query) ||
         (node.designation || "").toLowerCase().includes(query) ||
@@ -251,7 +324,7 @@ const OrgChartWorkspace: React.FC = () => {
       }
     });
     return matches;
-  }, [searchQuery, flatNodes]);
+  }, [searchQuery, filteredFlatNodes]);
 
   // Auto-expand paths to matched nodes when search query changes
   useEffect(() => {
@@ -259,16 +332,16 @@ const OrgChartWorkspace: React.FC = () => {
       setExpandedNodes((prev) => {
         const newExpanded = { ...prev };
         searchMatchedIds.forEach((id) => {
-          let current = flatNodes[id];
+          let current = filteredFlatNodes[id];
           while (current && current.reporting_to_id) {
             newExpanded[current.reporting_to_id] = true;
-            current = flatNodes[current.reporting_to_id];
+            current = filteredFlatNodes[current.reporting_to_id];
           }
         });
         return newExpanded;
       });
     }
-  }, [searchMatchedIds, flatNodes]);
+  }, [searchMatchedIds, filteredFlatNodes]);
 
   const toggleExpand = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -276,6 +349,47 @@ const OrgChartWorkspace: React.FC = () => {
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const expandAll = () => {
+    const newExpanded: Record<number, boolean> = {};
+    Object.keys(filteredFlatNodes).forEach((id) => {
+      newExpanded[Number(id)] = true;
+    });
+    setExpandedNodes(newExpanded);
+  };
+
+  const collapseAll = () => {
+    const newExpanded: Record<number, boolean> = {};
+    Object.keys(filteredFlatNodes).forEach((id) => {
+      newExpanded[Number(id)] = false;
+    });
+    setExpandedNodes(newExpanded);
+  };
+
+  const exportToPng = async () => {
+    const chartElement = document.querySelector(".org-chart-wrapper") as HTMLElement;
+    if (!chartElement) return;
+
+    try {
+      const canvas = await html2canvas(chartElement, {
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        scale: 2,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: chartElement.scrollWidth,
+        windowHeight: chartElement.scrollHeight
+      });
+
+      const image = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `OrgChart-${selectedDepartment || "All"}.png`;
+      link.href = image;
+      link.click();
+    } catch (error) {
+      console.error("Error exporting org chart:", error);
+    }
   };
 
   const handleNodeClick = (node: OrgNode) => {
@@ -325,26 +439,25 @@ const OrgChartWorkspace: React.FC = () => {
   };
 
   const stats = useMemo(() => {
-    const total = Object.keys(flatNodes).length;
+    const total = Object.keys(filteredFlatNodes).length;
     const departments = new Set(
-      Object.values(flatNodes)
+      Object.values(filteredFlatNodes)
         .map((n) => n.department)
         .filter(Boolean)
     ).size;
     
-    // Calculate levels in tree
     const getDepth = (nodes: OrgNode[]): number => {
       if (nodes.length === 0) return 0;
       return 1 + Math.max(0, ...nodes.map((n) => getDepth(n.children)));
     };
-    const maxDepth = getDepth(treeData);
+    const maxDepth = getDepth(filteredTreeData);
 
     return [
-      { label: "Total Headcount", value: total, meta: "Active employees" },
-      { label: "Departments", value: departments, meta: "Active business units" },
+      { label: "Total Headcount", value: total, meta: selectedDepartment ? `In ${selectedDepartment}` : "Active employees" },
+      { label: "Departments", value: selectedDepartment ? 1 : departments, meta: "Active business units" },
       { label: "Management Tiers", value: maxDepth, meta: "Reporting hierarchy depth" },
     ];
-  }, [flatNodes, treeData]);
+  }, [filteredFlatNodes, filteredTreeData, selectedDepartment]);
 
   return (
     <div className="page-wrapper">
@@ -371,8 +484,57 @@ const OrgChartWorkspace: React.FC = () => {
           <div className="col-xl-9">
             <div className="card payroll-panel">
               <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-4">
+                <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                   <h5 className="mb-0">Interactive Tree View</h5>
+                  
+                  <div className="d-flex align-items-center flex-wrap gap-2">
+                    {/* Department Filter */}
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ width: "200px" }}
+                      value={selectedDepartment}
+                      onChange={(e) => setSelectedDepartment(e.target.value)}
+                    >
+                      <option value="">All Departments</option>
+                      {departmentsList.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Expand / Collapse Actions */}
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={expandAll}
+                      type="button"
+                      title="Expand All Nodes"
+                    >
+                      <i className="ti ti-arrows-maximize me-1" />
+                      Expand All
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={collapseAll}
+                      type="button"
+                      title="Collapse All Nodes"
+                    >
+                      <i className="ti ti-arrows-minimize me-1" />
+                      Collapse All
+                    </button>
+
+                    {/* Export to PNG */}
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={exportToPng}
+                      type="button"
+                      title="Export Org Chart as PNG"
+                    >
+                      <i className="ti ti-download me-1" />
+                      Export PNG
+                    </button>
+                  </div>
+
                   <div className="input-group" style={{ maxWidth: "300px" }}>
                     <span className="input-group-text bg-white border-end-0">
                       <i className="ti ti-search text-muted" />
@@ -395,7 +557,7 @@ const OrgChartWorkspace: React.FC = () => {
                         <div>Loading organization tree...</div>
                       </div>
                     </div>
-                  ) : treeData.length === 0 ? (
+                  ) : filteredTreeData.length === 0 ? (
                     <HrmEmptyState
                       icon="ti ti-hierarchy"
                       title="No employees found"
@@ -403,7 +565,7 @@ const OrgChartWorkspace: React.FC = () => {
                     />
                   ) : (
                     <ul className="org-tree">
-                      {treeData.map((root) => renderNode(root))}
+                      {filteredTreeData.map((root) => renderNode(root))}
                     </ul>
                   )}
                 </div>

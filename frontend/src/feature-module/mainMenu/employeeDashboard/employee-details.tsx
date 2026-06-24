@@ -115,6 +115,11 @@ type Employee = {
   experience?: ExperienceItem[] | null;
   projects?: ProjectItem[] | null;
   assets?: AssetItem[] | null;
+  probation_status?: string | null;
+  probation_period_months?: number | null;
+  probation_end_date?: string | null;
+  confirmed_on?: string | null;
+  confirmed_by?: any | null;
 };
 
 const EmployeeDetails: React.FC = () => {
@@ -165,6 +170,67 @@ const EmployeeDetails: React.FC = () => {
   const [employeeList, setEmployeeList] = useState<Employee[]>([]);
   const [loadingList, setLoadingList] = useState<boolean>(false);
   const [selectedId, setSelectedId] = useState<string>("");
+
+  const [salaryRevisions, setSalaryRevisions] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [loadingGroup4, setLoadingGroup4] = useState<boolean>(false);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [newProbationEndDate, setNewProbationEndDate] = useState<string>("");
+  const [isExtending, setIsExtending] = useState<boolean>(false);
+
+  const loadGroup4Data = useCallback(async () => {
+    if (!employeeId) return;
+    setLoadingGroup4(true);
+    try {
+      const [revisionsRes, transfersRes] = await Promise.all([
+        API.get(`salary-revisions/?employee_id=${employeeId}`),
+        API.get(`employee-transfers/?employee_id=${employeeId}`),
+      ]);
+      setSalaryRevisions(normalizeList<any>(revisionsRes.data));
+      setTransfers(normalizeList<any>(transfersRes.data));
+    } catch (err) {
+      console.error("Failed to load group 4 details:", err);
+    } finally {
+      setLoadingGroup4(false);
+    }
+  }, [employeeId]);
+
+  const handleConfirmProbation = async () => {
+    if (!window.confirm("Are you sure you want to confirm this employee's probation?")) return;
+    setIsConfirming(true);
+    try {
+      await API.post(`employees/${employeeId}/confirm/`);
+      alert("Employee probation confirmed successfully!");
+      loadEmployee();
+    } catch (err) {
+      console.error("Failed to confirm probation:", err);
+      alert("Failed to confirm probation.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleExtendProbation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProbationEndDate) {
+      alert("Please select a new end date.");
+      return;
+    }
+    setIsExtending(true);
+    try {
+      await API.post(`employees/${employeeId}/extend-probation/`, {
+        new_end_date: newProbationEndDate,
+      });
+      alert("Employee probation extended successfully!");
+      setNewProbationEndDate("");
+      loadEmployee();
+    } catch (err) {
+      console.error("Failed to extend probation:", err);
+      alert("Failed to extend probation.");
+    } finally {
+      setIsExtending(false);
+    }
+  };
 
   const apiHost = useMemo(
     () => (API.defaults.baseURL || "").replace(/\/api\/?$/, ""),
@@ -249,8 +315,9 @@ const EmployeeDetails: React.FC = () => {
     if (employeeId) {
       loadEmployee();
       loadRequests();
+      loadGroup4Data();
     }
-  }, [employeeId, loadEmployee, loadRequests]);
+  }, [employeeId, loadEmployee, loadRequests, loadGroup4Data]);
 
   useEffect(() => {
     if (!employee) return;
@@ -1214,6 +1281,25 @@ const EmployeeDetails: React.FC = () => {
                           Assets ({assetsList.length})
                         </button>
                       </li>
+                      {(canEditEmployee || isSelf) && (
+                        <>
+                          <li className="nav-item" role="presentation">
+                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#salaryHistory" type="button" role="tab">
+                              Salary History ({salaryRevisions.length})
+                            </button>
+                          </li>
+                          <li className="nav-item" role="presentation">
+                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#transfers" type="button" role="tab">
+                              Transfers ({transfers.length})
+                            </button>
+                          </li>
+                          <li className="nav-item" role="presentation">
+                            <button className="nav-link" data-bs-toggle="tab" data-bs-target="#probation" type="button" role="tab">
+                              Probation ({employee?.probation_status ? String(employee.probation_status).replace("_", " ") : "Not Set"})
+                            </button>
+                          </li>
+                        </>
+                      )}
                     </ul>
                     <div className="d-flex gap-2">
                       {showEditButtons ? (
@@ -1302,6 +1388,214 @@ const EmployeeDetails: React.FC = () => {
     ))}
   </div>
 )}                    </div>
+
+                    {(canEditEmployee || isSelf) && (
+                      <>
+                        <div className="tab-pane fade" id="salaryHistory" role="tabpanel">
+                          {salaryRevisions.length === 0 ? (
+                            <p className="text-muted mb-0">No salary revision history found.</p>
+                          ) : (
+                            <div className="table-responsive">
+                              <table className="table align-middle mb-0">
+                                <thead>
+                                  <tr>
+                                    <th>Effective Date</th>
+                                    <th>Type</th>
+                                    <th>Previous Salary</th>
+                                    <th>New Salary</th>
+                                    <th>Change %</th>
+                                    <th>Status</th>
+                                    <th>Reason / Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {salaryRevisions.map((rev) => {
+                                    const prev = Number(rev.previous_salary || 0);
+                                    const next = Number(rev.new_salary || 0);
+                                    const pct = rev.revision_percentage || (prev > 0 ? ((next - prev) / prev) * 100 : 0);
+                                    return (
+                                      <tr key={rev.id}>
+                                        <td>{formatDisplayDate(rev.effective_date)}</td>
+                                        <td>
+                                          <span className="badge bg-outline-secondary text-capitalize">
+                                            {String(rev.revision_type || "increment").replace("_", " ")}
+                                          </span>
+                                        </td>
+                                        <td>{formatMoney(prev)}</td>
+                                        <td>{formatMoney(next)}</td>
+                                        <td>
+                                          <span className={`fw-semibold ${pct >= 0 ? "text-success" : "text-danger"}`}>
+                                            {pct >= 0 ? "+" : ""}{Number(pct).toFixed(1)}%
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <span className={`badge ${rev.status === "approved" ? "bg-success-light text-success" : "bg-warning-light text-warning"}`}>
+                                            {rev.status}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <div>{rev.reason || "-"}</div>
+                                          {rev.notes && <small className="text-muted">{rev.notes}</small>}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="tab-pane fade" id="transfers" role="tabpanel">
+                          {transfers.length === 0 ? (
+                            <p className="text-muted mb-0">No department/designation transfer records found.</p>
+                          ) : (
+                            <div className="timeline-container py-3">
+                              <div className="d-grid gap-4">
+                                {transfers.map((t) => (
+                                  <div key={t.id} className="border rounded-4 p-3 position-relative bg-light-gradient">
+                                    <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                      <div>
+                                        <span className="badge bg-primary px-3 py-1 mb-2">
+                                          {t.status.toUpperCase()}
+                                        </span>
+                                        <h6 className="mb-0">Effective Date: {formatDisplayDate(t.effective_date)}</h6>
+                                      </div>
+                                    </div>
+                                    <div className="row g-3 mt-2">
+                                      <div className="col-md-4">
+                                        <small className="text-muted d-block">Department</small>
+                                        <strong>{t.from_department?.name || "-"}</strong>
+                                        <i className="ti ti-arrow-narrow-right mx-2 text-primary" />
+                                        <strong>{t.to_department?.name || "-"}</strong>
+                                      </div>
+                                      <div className="col-md-4">
+                                        <small className="text-muted d-block">Designation</small>
+                                        <strong>{t.from_designation?.title || "-"}</strong>
+                                        <i className="ti ti-arrow-narrow-right mx-2 text-primary" />
+                                        <strong>{t.to_designation?.title || "-"}</strong>
+                                      </div>
+                                      <div className="col-md-4">
+                                        <small className="text-muted d-block">Reporting To</small>
+                                        <strong>
+                                          {t.from_reporting_to
+                                            ? `${t.from_reporting_to.first_name} ${t.from_reporting_to.last_name || ""}`.trim()
+                                            : "-"}
+                                        </strong>
+                                        <i className="ti ti-arrow-narrow-right mx-2 text-primary" />
+                                        <strong>
+                                          {t.to_reporting_to
+                                            ? `${t.to_reporting_to.first_name} ${t.to_reporting_to.last_name || ""}`.trim()
+                                            : "-"}
+                                        </strong>
+                                      </div>
+                                    </div>
+                                    {t.reason && (
+                                      <div className="mt-3 border-top pt-2">
+                                        <small className="text-muted d-block">Reason</small>
+                                        <p className="mb-0 text-secondary">{t.reason}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="tab-pane fade" id="probation" role="tabpanel">
+                          <div className="row g-4">
+                            <div className="col-md-6">
+                              <div className="border rounded-4 p-4 h-100">
+                                <h6 className="mb-3">Probation Status & Timeline</h6>
+                                <div className="employee-summary-list">
+                                  <div className="employee-summary-row">
+                                    <span>Status</span>
+                                    <strong>
+                                      <span className={`badge ${
+                                        employee.probation_status === "confirmed"
+                                          ? "bg-success-light text-success"
+                                          : employee.probation_status === "extended"
+                                          ? "bg-warning-light text-warning"
+                                          : "bg-info-light text-info"
+                                      }`}>
+                                        {String(employee.probation_status || "on_probation").toUpperCase().replace("_", " ")}
+                                      </span>
+                                    </strong>
+                                  </div>
+                                  <div className="employee-summary-row">
+                                    <span>Period (Months)</span>
+                                    <strong>{employee.probation_period_months ?? 6} Months</strong>
+                                  </div>
+                                  <div className="employee-summary-row">
+                                    <span>End Date</span>
+                                    <strong>{formatDisplayDate(employee.probation_end_date)}</strong>
+                                  </div>
+                                  {employee.confirmed_on && (
+                                    <div className="employee-summary-row">
+                                      <span>Confirmed On</span>
+                                      <strong>{formatDisplayDate(employee.confirmed_on)}</strong>
+                                    </div>
+                                  )}
+                                  {employee.confirmed_by && (
+                                    <div className="employee-summary-row">
+                                      <span>Confirmed By</span>
+                                      <strong>{employee.confirmed_by}</strong>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {canEditDirectly && (employee.probation_status === "on_probation" || employee.probation_status === "extended" || !employee.probation_status) && (
+                              <div className="col-md-6">
+                                <div className="border rounded-4 p-4 h-100">
+                                  <h6 className="mb-3">HR Action Panel</h6>
+                                  <div className="d-grid gap-3">
+                                    <div>
+                                      <button
+                                        type="button"
+                                        className="btn btn-success w-100"
+                                        onClick={handleConfirmProbation}
+                                        disabled={isConfirming}
+                                      >
+                                        {isConfirming ? "Confirming..." : "Confirm Employee"}
+                                      </button>
+                                      <small className="text-muted d-block mt-1">
+                                        Changes status to Confirmed immediately.
+                                      </small>
+                                    </div>
+                                    <hr className="my-2" />
+                                    <form onSubmit={handleExtendProbation}>
+                                      <label className="form-label fw-semibold">Extend Probation</label>
+                                      <div className="input-group">
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          value={newProbationEndDate}
+                                          onChange={(e) => setNewProbationEndDate(e.target.value)}
+                                          required
+                                        />
+                                        <button
+                                          type="submit"
+                                          className="btn btn-warning"
+                                          disabled={isExtending}
+                                        >
+                                          {isExtending ? "Extending..." : "Extend"}
+                                        </button>
+                                      </div>
+                                      <small className="text-muted d-block mt-1">
+                                        Extend probation to a specific future date.
+                                      </small>
+                                    </form>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

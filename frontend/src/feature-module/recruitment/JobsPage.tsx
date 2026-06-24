@@ -4,6 +4,39 @@ import { useAuth } from "../../core/auth/AuthContext";
 import CrudOpsWorkspace from "../liveops/CrudOpsWorkspace";
 import { formatCurrency } from "../hrm/hrmShared";
 
+interface JobRecord {
+  id: number;
+  title: string;
+  department_name?: string;
+  location?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  work_mode?: string;
+  employment_type?: string;
+  openings?: number;
+  status?: string;
+  is_public?: boolean | string;
+  hiring_manager?: string;
+  experience_band?: string;
+  experience_min_years?: number;
+  experience_max_years?: number;
+  salary_min?: number;
+  salary_max?: number;
+  posted_on?: string;
+  closing_on?: string;
+  skills_text?: string;
+  benefits_text?: string;
+  description?: string;
+  skills?: string[];
+  benefits?: string[];
+  public_path?: string;
+  share_links?: {
+    linkedin?: string;
+    indeed?: string;
+  };
+}
+
 const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "open", label: "Open" },
@@ -82,59 +115,59 @@ const fields = [
 const columns = [
   {
     label: "Role",
-    render: (record) => (
+    render: (record: JobRecord) => (
       <div>
         <div className="fw-semibold">{record.title}</div>
         <div className="text-muted small">{record.department_name || "General"}</div>
       </div>
     ),
-    text: (record) => record.title,
+    text: (record: JobRecord) => record.title,
   },
   {
     label: "Hiring",
-    render: (record) => (
+    render: (record: JobRecord) => (
       <div>
         <div>{record.hiring_manager || "TBD"}</div>
         <div className="text-muted small">{record.location || [record.city, record.state].filter(Boolean).join(", ") || "Location pending"}</div>
       </div>
     ),
-    text: (record) => record.hiring_manager || "TBD",
+    text: (record: JobRecord) => record.hiring_manager || "TBD",
   },
-  { label: "Employment", render: (record) => record.employment_type || "-", text: (record) => record.employment_type || "-" },
-  { label: "Openings", render: (record) => record.openings || 0, text: (record) => record.openings || 0 },
+  { label: "Employment", render: (record: JobRecord) => record.employment_type || "-", text: (record: JobRecord) => record.employment_type || "-" },
+  { label: "Openings", render: (record: JobRecord) => record.openings || 0, text: (record: JobRecord) => record.openings || 0 },
   {
     label: "Portal",
-    render: (record) => (
+    render: (record: JobRecord) => (
       <div>
         <span className={`payroll-badge ${record.is_public ? "success" : "warning"}`}>{record.is_public ? "Public" : "Internal"}</span>
         <div className="text-muted small mt-1">{record.work_mode || "Hybrid"}</div>
       </div>
     ),
-    text: (record) => (record.is_public ? "Public" : "Internal"),
+    text: (record: JobRecord) => (record.is_public ? "Public" : "Internal"),
   },
   {
     label: "Share",
-    render: (record) => (
+    render: (record: JobRecord) => (
       <div className="d-flex flex-wrap gap-2">
         <a href={record.share_links?.linkedin} target="_blank" rel="noreferrer" className="btn btn-sm btn-light">LinkedIn</a>
         <a href={record.share_links?.indeed} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Indeed</a>
       </div>
     ),
-    text: (record) => record.public_path || "-",
+    text: (record: JobRecord) => record.public_path || "-",
   },
 ];
 
-const JobsPage = () => {
+const JobsPage: React.FC = () => {
   const { role } = useAuth();
   const stakeholderView = role === "stakeholder";
 
   const highlightsBuilder = useMemo(
-    () => (records) =>
+    () => (records: JobRecord[]) =>
       records.slice(0, 5).map((item) => ({
         label: item.title,
         meta: `${item.department_name || "General"} · ${item.work_mode || "Hybrid"}`,
         value: item.is_public ? "Public" : "Internal",
-        tone: item.is_public ? "success" : "warning",
+        tone: item.is_public ? "success" : "warning" as const,
       })),
     []
   );
@@ -161,14 +194,14 @@ const JobsPage = () => {
       allowEdit={!stakeholderView}
       canDelete={!stakeholderView}
       highlightsBuilder={highlightsBuilder}
-      normalizeForm={(record) => ({
+      normalizeForm={(record: JobRecord) => ({
         ...defaultForm,
         ...record,
         is_public: String(Boolean(record.is_public)),
         skills_text: Array.isArray(record.skills) ? record.skills.join(", ") : "",
         benefits_text: Array.isArray(record.benefits) ? record.benefits.join(", ") : "",
       })}
-      buildPayload={(form) => ({
+      buildPayload={(form: any) => ({
         ...form,
         openings: Number(form.openings || 1),
         experience_min_years: Number(form.experience_min_years || 0),
@@ -176,10 +209,10 @@ const JobsPage = () => {
         salary_min: Number(form.salary_min || 0),
         salary_max: Number(form.salary_max || 0),
         is_public: String(form.is_public) === "true",
-        skills: String(form.skills_text || "").split(",").map((item) => item.trim()).filter(Boolean),
-        benefits: String(form.benefits_text || "").split(",").map((item) => item.trim()).filter(Boolean),
+        skills: String(form.skills_text || "").split(",").map((item: string) => item.trim()).filter(Boolean),
+        benefits: String(form.benefits_text || "").split(",").map((item: string) => item.trim()).filter(Boolean),
       })}
-      summaryBuilder={(fieldsList, form) => (
+      summaryBuilder={(fieldsList: any, form: any) => (
         <div className="payroll-summary-list">
           <div className="payroll-summary-row"><span>Role</span><strong>{form.title || "-"}</strong></div>
           <div className="payroll-summary-row"><span>Portal visibility</span><strong>{String(form.is_public) === "true" ? "Public" : "Internal"}</strong></div>
@@ -187,7 +220,7 @@ const JobsPage = () => {
           <div className="payroll-summary-row"><span>Hiring owner</span><strong>{form.hiring_manager || "TBD"}</strong></div>
         </div>
       )}
-      statsBuilder={(records) => {
+      statsBuilder={(records: JobRecord[]) => {
         const open = records.filter((item) => item.status === "open").length;
         const openings = records.reduce((sum, item) => sum + Number(item.openings || 0), 0);
         const publicRoles = records.filter((item) => item.is_public).length;

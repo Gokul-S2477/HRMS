@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.db.models import Count, Q
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -98,6 +98,37 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 roots.append(node)
                 
         return Response(roots)
+
+    @action(detail=True, methods=["post"], url_path="confirm")
+    def confirm_probation(self, request, pk=None):
+        if not is_hr_or_above(request.user):
+            return Response({"detail": "Only HR and Admins can confirm probation."}, status=status.HTTP_403_FORBIDDEN)
+        employee = self.get_object()
+        employee.probation_status = "confirmed"
+        employee.confirmed_on = datetime.now().date()
+        employee.confirmed_by = request.user
+        employee.save(update_fields=["probation_status", "confirmed_on", "confirmed_by", "updated_at"])
+        return Response(self.get_serializer(employee).data)
+
+    @action(detail=True, methods=["post"], url_path="extend-probation")
+    def extend_probation(self, request, pk=None):
+        if not is_hr_or_above(request.user):
+            return Response({"detail": "Only HR and Admins can extend probation."}, status=status.HTTP_403_FORBIDDEN)
+        employee = self.get_object()
+        new_end_date_str = request.data.get("new_end_date") or request.data.get("probation_end_date")
+        if not new_end_date_str:
+            return Response({"detail": "new_end_date is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from datetime import date
+            new_end_date = date.fromisoformat(new_end_date_str)
+        except ValueError:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        employee.probation_status = "extended"
+        employee.probation_end_date = new_end_date
+        employee.save(update_fields=["probation_status", "probation_end_date", "updated_at"])
+        return Response(self.get_serializer(employee).data)
+
 
 
 class PolicyViewSet(viewsets.ModelViewSet):

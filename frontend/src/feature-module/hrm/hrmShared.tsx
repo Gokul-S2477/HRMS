@@ -6,21 +6,21 @@ import {
   normalizeList,
 } from "../mainMenu/employeeDashboard/employeeShared";
 
-export const normalizeResourceRecords = (data) => normalizeList(data);
+export const normalizeResourceRecords = (data: any) => normalizeList(data);
 
-export const toNumber = (value) => {
+export const toNumber = (value: any): number => {
   const parsed = Number.parseFloat(String(value ?? "").replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const formatCurrency = (value) =>
+export const formatCurrency = (value: any): string =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(toNumber(value));
 
-export const formatDisplayDate = (value) => {
+export const formatDisplayDate = (value: any): string => {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -31,7 +31,7 @@ export const formatDisplayDate = (value) => {
   });
 };
 
-export const formatDateTimeLabel = (value) => {
+export const formatDateTimeLabel = (value: any): string => {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -44,7 +44,7 @@ export const formatDateTimeLabel = (value) => {
   });
 };
 
-export const calculateHours = (checkIn, checkOut) => {
+export const calculateHours = (checkIn: any, checkOut: any): number => {
   if (!checkIn || !checkOut) return 0;
   const [inHour, inMinute] = String(checkIn).split(":").map((part) => Number(part));
   const [outHour, outMinute] = String(checkOut).split(":").map((part) => Number(part));
@@ -55,14 +55,14 @@ export const calculateHours = (checkIn, checkOut) => {
   return Math.round(((end - start) / 60) * 10) / 10;
 };
 
-export const daysUntil = (value) => {
+export const daysUntil = (value: any): number | null => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
-export const dayDifference = (fromValue, toValue) => {
+export const dayDifference = (fromValue: any, toValue: any): number | null => {
   if (!fromValue || !toValue) return null;
   const from = new Date(fromValue);
   const to = new Date(toValue);
@@ -70,7 +70,7 @@ export const dayDifference = (fromValue, toValue) => {
   return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-const flattenSearchValues = (input) => {
+const flattenSearchValues = (input: any): string[] => {
   if (input === null || input === undefined) return [];
   if (Array.isArray(input)) {
     return input.flatMap((item) => flattenSearchValues(item));
@@ -81,7 +81,7 @@ const flattenSearchValues = (input) => {
   return [String(input)];
 };
 
-export const smartSearchMatch = (input, query, extras = []) => {
+export const smartSearchMatch = (input: any, query: string, extras: any[] = []): boolean => {
   const normalizedQuery = String(query || "")
     .toLowerCase()
     .split(/\s+/)
@@ -94,7 +94,7 @@ export const smartSearchMatch = (input, query, extras = []) => {
   return normalizedQuery.every((token) => haystack.includes(token));
 };
 
-export const isDateInRange = (value, start, end) => {
+export const isDateInRange = (value: any, start: any, end: any): boolean => {
   if (!start && !end) return true;
   if (!value) return false;
   const date = new Date(value);
@@ -113,18 +113,18 @@ export const isDateInRange = (value, start, end) => {
   return true;
 };
 
-export const matchesAnyDateRange = (values, start, end) => {
+export const matchesAnyDateRange = (values: any, start: any, end: any): boolean => {
   if (!start && !end) return true;
   return flattenSearchValues(values).some((value) => isDateInRange(value, start, end));
 };
 
-export const activeFilterCount = (filters) =>
-  Object.values(filters || {}).filter((value) => {
+export const activeFilterCount = (filters: any): number =>
+  Object.values(filters || {}).filter((value: any) => {
     if (Array.isArray(value)) return value.length > 0;
     return value !== null && value !== undefined && String(value).trim() !== "";
   }).length;
 
-export const toneClass = (tone) => {
+export const toneClass = (tone: string): string => {
   switch (tone) {
     case "success":
       return "success";
@@ -140,7 +140,7 @@ export const toneClass = (tone) => {
   }
 };
 
-export const statusTone = (status) => {
+export const statusTone = (status: any): string => {
   const key = String(status ?? "").toLowerCase();
   if (["active", "present", "approved", "completed", "closed", "filed"].includes(key)) {
     return "success";
@@ -157,7 +157,7 @@ export const statusTone = (status) => {
   return "accent";
 };
 
-export const initialEmployeePayload = (employee) => ({
+export const initialEmployeePayload = (employee: any) => ({
   employee_id: employee?.id ? String(employee.id) : "",
   employee_name: employee?.name || "",
   department: employee?.department || "",
@@ -166,9 +166,9 @@ export const initialEmployeePayload = (employee) => ({
   phone: employee?.phone || "",
 });
 
-export const fetchEmployeeDirectory = async () => {
+export const fetchEmployeeDirectory = async (): Promise<any[]> => {
   const response = await API.get("/employees/");
-  return normalizeList(response.data).map((employee) => ({
+  return normalizeList(response.data).map((employee: any) => ({
     id: employee.id,
     name: employeeFullName(employee),
     email: employee.email || "",
@@ -181,10 +181,19 @@ export const fetchEmployeeDirectory = async () => {
   }));
 };
 
-export const selectEmployee = (employees, id) =>
+export const selectEmployee = (employees: any[], id: any): any =>
   employees.find((employee) => String(employee.id) === String(id)) || null;
 
-export const HrmHero = (props) => {
+interface HrmHeroProps {
+  kicker?: string;
+  title: string;
+  subtitle: string;
+  action?: React.ReactNode;
+  stats?: Array<{ label: string; value: any; meta?: string }>;
+  children?: React.ReactNode;
+}
+
+export const HrmHero: React.FC<HrmHeroProps> = (props) => {
   const { kicker, title, subtitle, action, stats, children } = props;
   return (
     <div className="card payroll-hero mb-4">
@@ -220,7 +229,13 @@ export const HrmHero = (props) => {
   );
 };
 
-export const HrmEmptyState = ({ icon = "ti ti-folder-open", title, description }) => (
+interface HrmEmptyStateProps {
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+export const HrmEmptyState: React.FC<HrmEmptyStateProps> = ({ icon = "ti ti-folder-open", title, description }) => (
   <div className="payroll-empty">
     <i className={icon} />
     <h5 className="mb-2">{title}</h5>
@@ -228,7 +243,13 @@ export const HrmEmptyState = ({ icon = "ti ti-folder-open", title, description }
   </div>
 );
 
-export const HrmSideList = ({ title, items, emptyLabel = "No highlights yet." }) => (
+interface HrmSideListProps {
+  title: string;
+  items?: Array<{ label: string; meta?: string; value?: any; tone?: string }>;
+  emptyLabel?: string;
+}
+
+export const HrmSideList: React.FC<HrmSideListProps> = ({ title, items, emptyLabel = "No highlights yet." }) => (
   <div className="card payroll-section-card h-100">
     <div className="card-body">
       <div className="payroll-section-header">
@@ -243,7 +264,7 @@ export const HrmSideList = ({ title, items, emptyLabel = "No highlights yet." })
                 {item.meta ? <div className="payroll-secondary-text">{item.meta}</div> : null}
               </div>
               {item.value ? (
-                <span className={`payroll-badge ${toneClass(item.tone)}`}>{item.value}</span>
+                <span className={`payroll-badge ${toneClass(item.tone || "")}`}>{item.value}</span>
               ) : null}
             </div>
           ))}
@@ -255,7 +276,18 @@ export const HrmSideList = ({ title, items, emptyLabel = "No highlights yet." })
   </div>
 );
 
-export const HrmModal = ({
+interface HrmModalProps {
+  open: boolean;
+  title: string;
+  subtitle?: string;
+  summary?: React.ReactNode;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  submitLabel: string;
+  children: React.ReactNode;
+}
+
+export const HrmModal: React.FC<HrmModalProps> = ({
   open,
   title,
   subtitle,

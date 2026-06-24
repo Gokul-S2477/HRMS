@@ -66,7 +66,7 @@ const Holidays: React.FC = () => {
     setLoading(true);
     try {
       const response = await API.get(RESOURCE);
-      setHolidays(normalizeResourceRecords(response.data));
+      setHolidays(normalizeResourceRecords(response.data) as HolidayRecord[]);
     } catch (error) {
       console.error("Failed to load holidays", error);
       setHolidays([]);

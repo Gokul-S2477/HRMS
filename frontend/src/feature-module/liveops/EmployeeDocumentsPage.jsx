@@ -33,8 +33,7 @@ const EmployeeDocumentsPage = () => {
       { name: "employee_id", label: "Employee", type: "select", optionsKey: "employees" },
       { name: "category_id", label: "Category", type: "select", optionsKey: "categories" },
       { name: "title", label: "Title", required: true },
-      { name: "file_name", label: "File Name" },
-      { name: "document_url", label: "Document URL", type: "url" },
+      { name: "file", label: "Upload Document File", type: "file", required: true },
       { name: "document_number", label: "Document Number" },
       { name: "status", label: "Status", type: "select", options: [
         { value: "pending", label: "Pending Review" },
@@ -57,7 +56,7 @@ const EmployeeDocumentsPage = () => {
     ]}
     columns={[
       { label: "Employee", render: (record) => <div><div className="fw-semibold">{record.employee?.full_name || "Employee"}</div><div className="text-muted small">{record.employee?.department_name || record.category?.name || "-"}</div></div> },
-      { label: "Document", render: (record) => <div><div className="fw-semibold">{record.title}</div><div className="text-muted small">{record.document_number || record.file_name || record.category?.name || "-"}</div></div> },
+      { label: "Document", render: (record) => <div><div className="fw-semibold">{record.document_url ? <a href={record.document_url} target="_blank" rel="noopener noreferrer">{record.title} <i className="ti ti-external-link ms-1 small" /></a> : record.title}</div><div className="text-muted small">{record.document_number || record.file_name || record.category?.name || "-"}</div></div> },
       { label: "Dates", render: (record) => <div><div>Issued: {formatDisplayDate(record.issued_on)}</div><div className="text-muted small">Expires: {formatDisplayDate(record.expires_on)}</div></div> },
       { label: "Status", render: (record) => <span className={`payroll-badge ${record.status === "verified" ? "success" : record.status === "pending" ? "warning" : "danger"}`}>{record.status}</span> },
     ]}
@@ -65,8 +64,7 @@ const EmployeeDocumentsPage = () => {
       employee_id: "",
       category_id: "",
       title: "",
-      file_name: "",
-      document_url: "",
+      file: null,
       document_number: "",
       status: "pending",
       issued_on: "",
@@ -77,8 +75,7 @@ const EmployeeDocumentsPage = () => {
       employee_id: record.employee?.id ? String(record.employee.id) : "",
       category_id: record.category?.id ? String(record.category.id) : "",
       title: record.title || "",
-      file_name: record.file_name || "",
-      document_url: record.document_url || "",
+      file: null,
       document_number: record.document_number || "",
       status: record.status || "pending",
       issued_on: record.issued_on || "",

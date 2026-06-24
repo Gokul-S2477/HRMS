@@ -191,7 +191,7 @@ const STAGES: StepDetail[] = [
       "Shift rules & scheduler timetables"
     ],
     models: ["LeaveBalance", "LeaveLedger", "TimesheetEntry", "ShiftDefinition", "OvertimeEntry"],
-    endpoints: ["/api/leave-ledger/", "/api/timesheets/", "/api/shift-definitions/", "/api/overtime-entries/", "/api/data/attendance-employee/"],
+    endpoints: ["/api/leave-ledger/", "/api/timesheets/", "/api/shift-definitions/", "/api/overtime-entries/", "/api/attendance-records/"],
     interdependencies: [
       { target: "Payroll & Finance", description: "Unpaid leave balances and overtime hours are directly piped into the monthly payroll engine." }
     ],

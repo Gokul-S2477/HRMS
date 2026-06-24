@@ -139,3 +139,28 @@ class UserAccountViewSet(viewsets.ModelViewSet):
         account.is_active = True
         account.save(update_fields=["password", "must_change_password", "account_status", "is_active"])
         return Response({"temporary_password": new_password, "account": UserAccountSerializer(account).data})
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+
+        if not current_password or not new_password:
+            return Response(
+                {"detail": "Both current_password and new_password are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        if not user.check_password(current_password):
+            return Response({"detail": "Incorrect current password."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+
+        return Response({"status": "password_changed", "message": "Password changed successfully."})
+

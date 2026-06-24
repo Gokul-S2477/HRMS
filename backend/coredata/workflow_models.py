@@ -1351,3 +1351,278 @@ class DocumentSignature(models.Model):
 
     def __str__(self) -> str:
         return f"{self.employee.first_name} - {self.document.title} ({self.status})"
+
+
+class AttendanceRecord(models.Model):
+    STATUS_PRESENT = "Present"
+    STATUS_ABSENT = "Absent"
+    STATUS_ON_LEAVE = "On Leave"
+    STATUS_HALF_DAY = "Half Day"
+    STATUS_LATE = "Late"
+    STATUS_CHOICES = (
+        (STATUS_PRESENT, "Present"),
+        (STATUS_ABSENT, "Absent"),
+        (STATUS_ON_LEAVE, "On Leave"),
+        (STATUS_HALF_DAY, "Half Day"),
+        (STATUS_LATE, "Late"),
+    )
+
+    employee = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.CASCADE,
+        related_name="attendance_records",
+    )
+    work_date = models.DateField(db_index=True)
+    check_in_time = models.TimeField(null=True, blank=True)
+    check_out_time = models.TimeField(null=True, blank=True)
+    check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_out_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_out_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_ip = models.GenericIPAddressField(null=True, blank=True)
+    check_out_ip = models.GenericIPAddressField(null=True, blank=True)
+    check_in_method = models.CharField(max_length=20, default="web")  # "web", "qr", "manual"
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PRESENT, db_index=True)
+    total_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    break_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    on_break = models.BooleanField(default=False)
+    breaks = models.JSONField(default=list, blank=True)
+    work_mode = models.CharField(max_length=20, default="Office")  # "Office", "Remote", "Hybrid"
+    shift = models.CharField(max_length=40, default="General")
+    punctuality = models.CharField(max_length=40, default="On time")
+    discrepancy = models.BooleanField(default=False)
+    discrepancy_reasons = models.JSONField(default=list, blank=True)
+    is_regularized = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("employee", "work_date")
+        ordering = ["-work_date", "employee__first_name"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.work_date} ({self.status})"
+
+
+class TrainingProgram(models.Model):
+    TRAINING_TYPES = [
+        ("internal", "Internal"),
+        ("external", "External"),
+        ("online", "Online"),
+    ]
+    STATUS_CHOICES = [
+        ("planned", "Planned"),
+        ("active", "Active"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    trainer_name = models.CharField(max_length=120, blank=True, null=True)
+    training_type = models.CharField(max_length=20, choices=TRAINING_TYPES, default="internal")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    duration_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    venue = models.CharField(max_length=200, blank=True, null=True)
+    cost_per_head = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    max_seats = models.IntegerField(default=30)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
+    department = models.ForeignKey("employees.Department", on_delete=models.SET_NULL, null=True, blank=True, related_name="training_programs")
+    skills_covered = models.JSONField(default=list, blank=True)
+    is_mandatory = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class TrainingEnrollment(models.Model):
+    STATUS_CHOICES = [
+        ("enrolled", "Enrolled"),
+        ("completed", "Completed"),
+        ("absent", "Absent"),
+        ("cancelled", "Cancelled"),
+    ]
+    program = models.ForeignKey(TrainingProgram, on_delete=models.CASCADE, related_name="enrollments")
+    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="training_enrollments")
+    enrollment_date = models.DateField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="enrolled")
+    score = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    certificate_url = models.CharField(max_length=255, blank=True, null=True)
+    feedback = models.TextField(blank=True, null=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("program", "employee")
+        ordering = ["-enrollment_date"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.program.title}"
+
+
+class ReviewCycle(models.Model):
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("active", "Active"),
+        ("completed", "Completed"),
+    ]
+    CYCLE_TYPES = [
+        ("annual", "Annual"),
+        ("mid-year", "Mid-Year"),
+        ("quarterly", "Quarterly"),
+    ]
+    name = models.CharField(max_length=150)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    cycle_type = models.CharField(max_length=20, choices=CYCLE_TYPES, default="annual")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_start"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class PerformanceReview(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("draft", "Draft"),
+        ("submitted", "Submitted"),
+        ("finalized", "Finalized"),
+    ]
+    cycle = models.ForeignKey(ReviewCycle, on_delete=models.CASCADE, related_name="reviews")
+    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="performance_reviews")
+    reviewer = models.ForeignKey("employees.Employee", on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_reviews")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    self_rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    manager_rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    final_rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("cycle", "employee")
+        ordering = ["-cycle__period_start"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.cycle.name}"
+
+
+class ReviewGoal(models.Model):
+    review = models.ForeignKey(PerformanceReview, on_delete=models.CASCADE, related_name="goals")
+    title = models.CharField(max_length=200)
+    target = models.CharField(max_length=255, blank=True, null=True)
+    achievement = models.CharField(max_length=255, blank=True, null=True)
+    weight = models.DecimalField(max_digits=5, decimal_places=2, default=1.0)
+    rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class ReviewFeedback(models.Model):
+    FEEDBACK_TYPES = [
+        ("self", "Self"),
+        ("manager", "Manager"),
+        ("peer", "Peer"),
+    ]
+    review = models.ForeignKey(PerformanceReview, on_delete=models.CASCADE, related_name="feedbacks")
+    from_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    feedback_type = models.CharField(max_length=20, choices=FEEDBACK_TYPES, default="self")
+    strengths = models.TextField(blank=True, null=True)
+    improvements = models.TextField(blank=True, null=True)
+    rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.feedback_type} Feedback for {self.review}"
+
+
+class PeerFeedback(models.Model):
+    reviewer = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="given_peer_feedbacks")
+    reviewee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="received_peer_feedbacks")
+    cycle = models.ForeignKey(ReviewCycle, on_delete=models.CASCADE, related_name="peer_feedbacks")
+    rating = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    comments = models.TextField(blank=True, null=True)
+    anonymous = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("reviewer", "reviewee", "cycle")
+
+    def __str__(self) -> str:
+        return f"Feedback from {self.reviewer.first_name} to {self.reviewee.first_name}"
+
+
+class Announcement(models.Model):
+    PRIORITY_CHOICES = [
+        ("low", "Low"),
+        ("normal", "Normal"),
+        ("high", "High"),
+        ("urgent", "Urgent"),
+    ]
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default="normal")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="announcements")
+    published_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    target_audience = models.CharField(max_length=50, default="all")  # "all", "department", "role"
+    department_ids = models.JSONField(default=list, blank=True)
+    role_names = models.JSONField(default=list, blank=True)
+    is_pinned = models.BooleanField(default=False)
+    attachment_url = models.CharField(max_length=255, blank=True, null=True)
+    views_count = models.IntegerField(default=0)
+    read_by = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="read_announcements")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_pinned", "-published_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class DisciplinaryAction(models.Model):
+    ACTION_TYPES = [
+        ("verbal_warning", "Verbal Warning"),
+        ("written_warning", "Written Warning"),
+        ("suspension", "Suspension"),
+        ("termination_notice", "Termination Notice"),
+    ]
+    STATUS_CHOICES = [
+        ("issued", "Issued"),
+        ("acknowledged", "Acknowledged"),
+        ("closed", "Closed"),
+        ("disputed", "Disputed"),
+    ]
+    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="disciplinary_actions")
+    action_type = models.CharField(max_length=30, choices=ACTION_TYPES, default="written_warning")
+    incident_date = models.DateField()
+    incident_description = models.TextField()
+    issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="issued_disciplinary_actions")
+    issued_on = models.DateField(auto_now_add=True)
+    response_required_by = models.DateField(blank=True, null=True)
+    employee_response = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="issued")
+    attachment_url = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-issued_on", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.action_type} for {self.employee.first_name}"
+

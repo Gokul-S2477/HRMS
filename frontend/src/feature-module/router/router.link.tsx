@@ -22,6 +22,7 @@ import EmailVerification from "../auth/emailVerification/emailVerification";
 import EmailVerification2 from "../auth/emailVerification/emailVerification-2";
 import EmailVerification3 from "../auth/emailVerification/emailVerification-3";
 import LockScreen from "../auth/lockScreen";
+import ChangePassword from "../auth/changePassword/ChangePassword";
 import ComingSoon from "../pages/comingSoon";
 import UnderMaintenance from "../pages/underMaintenance";
 import Error404 from "../pages/error/error-404";
@@ -29,12 +30,14 @@ import Error500 from "../pages/error/error-500";
 
 import AdminDashboard from "../mainMenu/adminDashboard";
 import EmployeeDashboard from "../mainMenu/employeeDashboard/employee-dashboard";
+import MyWorkspace from "../mainMenu/employeeDashboard/MyWorkspace";
 import LeadsDashboard from "../mainMenu/leadsDashboard";
 import DealsDashboard from "../mainMenu/dealsDashboard";
 
 import EmployeeList from "../mainMenu/employeeDashboard/employee-list";
 import EmployeeGrid from "../mainMenu/employeeDashboard/employee-grid";
 import EmployeeDetails from "../mainMenu/employeeDashboard/employee-details";
+import EmployeeBulkImport from "../mainMenu/employeeDashboard/EmployeeBulkImport";
 import Departments from "../mainMenu/employeeDashboard/departments";
 import Designations from "../mainMenu/employeeDashboard/designations";
 import Policies from "../mainMenu/employeeDashboard/policies";
@@ -51,6 +54,8 @@ import OvertimePage from "../hrm/overtime";
 import ShiftRulesPage from "../hrm/shift-rules";
 import ExpensesWorkspace from "../hrm/ExpensesWorkspace";
 import OrgChartWorkspace from "../hrm/OrgChartWorkspace";
+import DisciplinaryActions from "../hrm/DisciplinaryActions";
+import Announcements from "../hrm/Announcements";
 
 import Tickets from "../tickets/tickets";
 import TicketDetails from "../tickets/ticket-details";
@@ -88,6 +93,8 @@ import PayslipList from "../accounts/payslips/PayslipList";
 import PayslipView from "../accounts/payslips/PayslipView";
 import PayrollItems from "../accounts/payroll-items";
 import FinalSettlementsPage from "../accounts/FinalSettlementsPage";
+import StatutoryReports from "../accounts/StatutoryReports";
+import EmployeeLoans from "../accounts/EmployeeLoans";
 
 import CategoriesPage from "../accounts/accounting/CategoriesPage";
 import BudgetsPage from "../accounts/accounting/BudgetsPage";
@@ -156,6 +163,7 @@ export const publicRoutes = [
   { path: routes.emailVerification2, element: <EmailVerification2 />, route: Route },
   { path: routes.emailVerification3, element: <EmailVerification3 />, route: Route },
   { path: routes.lockScreen, element: <LockScreen />, route: Route },
+  { path: routes.changePassword, element: <ChangePassword />, route: Route },
   { path: routes.comingSoon, element: <ComingSoon />, route: Route },
   { path: routes.underMaintenance, element: <UnderMaintenance />, route: Route },
   { path: routes.error404, element: <Error404 />, route: Route },
@@ -167,6 +175,7 @@ export const protectedRoutes = [
   { path: routes.superAdminDashboard, element: <AdminDashboard />, allowedRoles: ["super_admin"] },
   { path: routes.flowBlueprint, element: <FlowBlueprint />, allowedRoles: ["super_admin"] },
   { path: routes.employeeDashboard, element: <EmployeeDashboard />, allowedRoles: ["super_admin", "hr", "employee"] },
+  { path: routes.myWorkspace, element: <MyWorkspace />, allowedRoles: ["super_admin", "hr", "employee"] },
   { path: routes.leadsDashboard, element: <LeadsDashboard />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.dealsDashboard, element: <DealsDashboard />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.chat, element: <Chat />, allowedRoles: CHAT_ALLOWED },
@@ -195,6 +204,7 @@ export const protectedRoutes = [
 
   { path: routes.employeeList, element: <EmployeeList />, allowedRoles: HR_ALLOWED },
   { path: routes.employeeAdd, element: <EmployeeAdd />, allowedRoles: HR_ALLOWED },
+  { path: routes.employeeBulkImport, element: <EmployeeBulkImport />, allowedRoles: HR_ALLOWED },
   { path: routes.employeeGrid, element: <EmployeeGrid />, allowedRoles: HR_ALLOWED },
   { path: routes.employeedetails, element: <EmployeeDetails />, allowedRoles: EMPLOYEE_SELF_ALLOWED },
   { path: routes.employeeDetailsView, element: <EmployeeDetails />, allowedRoles: EMPLOYEE_SELF_ALLOWED },
@@ -234,7 +244,7 @@ export const protectedRoutes = [
   { path: routes.joblist, element: <JobsPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.candidatesGrid, element: <CandidatesPage variant="cards" />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.candidateslist, element: <CandidatesPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
-  { path: routes.candidateskanban, element: <CandidatesPage variant="cards" />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
+  { path: routes.candidateskanban, element: <CandidatesPage variant="kanban" />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.recruitmentInterviews, element: <RecruitmentInterviewsPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
   { path: routes.refferal, element: <ReferralsPage />, allowedRoles: ["super_admin", "hr", "stakeholder"] },
 
@@ -259,6 +269,10 @@ export const protectedRoutes = [
   { path: routes.payslipsView, element: <PayslipView />, allowedRoles: ["super_admin", "hr", "employee"] },
   { path: routes.payrollItems, element: <PayrollItems />, allowedRoles: HR_ALLOWED },
   { path: routes.finalSettlements, element: <FinalSettlementsPage />, allowedRoles: HR_ALLOWED },
+  { path: routes.statutoryReports, element: <StatutoryReports />, allowedRoles: ["super_admin", "hr", "employee"] },
+  { path: routes.employeeLoans, element: <EmployeeLoans />, allowedRoles: ["super_admin", "hr", "employee"] },
+  { path: routes.disciplinary, element: <DisciplinaryActions />, allowedRoles: ["super_admin", "hr", "employee"] },
+  { path: routes.announcements, element: <Announcements />, allowedRoles: ["super_admin", "hr", "employee"] },
   { path: routes.payrollAddition, element: <PayrollItems />, allowedRoles: HR_ALLOWED },
   { path: routes.payrollOvertime, element: <PayrollItems />, allowedRoles: HR_ALLOWED },
   { path: routes.payrollDeduction, element: <PayrollItems />, allowedRoles: HR_ALLOWED },

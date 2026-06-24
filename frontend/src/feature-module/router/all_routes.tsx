@@ -4,6 +4,7 @@ export const all_routes = {
   // ----- Dashboard -----
   adminDashboard: "/index",
   employeeDashboard: "/employee-dashboard",
+  myWorkspace: "/my-workspace",
   leadsDashboard: "/leads-dashboard",
   dealsDashboard: "/deals-dashboard",
 
@@ -80,6 +81,12 @@ export const all_routes = {
   resetPasswordSuccess: "/success",
   resetPasswordSuccess2: "/success-2",
   resetPasswordSuccess3: "/success-3",
+  changePassword: "/change-password",
+  statutoryReports: "/statutory-reports",
+  employeeLoans: "/accounts/loans",
+  disciplinary: "/hrm/disciplinary",
+  announcements: "/hrm/announcements",
+
 
   // ----- UI -----
   alert: "/ui-alert",
@@ -220,6 +227,7 @@ export const all_routes = {
   rolesPermissions: "/user-management/roles-permissions",
   manageusers: "/user-management/manage-users",
   permissions: "/user-management/permissions",
+  employeeBulkImport: "/employees/bulk-import",
 
   // ----- Support -----
   contactMessages: "/support/contact-messages",

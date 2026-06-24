@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import CollapseHeader from "../../core/common/collapse-header/collapse-header";
 import API from "../../api/axios";
+import { useAuth } from "../../core/auth/AuthContext";
 import {
   HrmEmptyState,
   HrmHero,
@@ -23,7 +24,21 @@ const STATUS_OPTIONS = ["Present", "Absent", "On Leave", "Half Day", "Late"];
 const SHIFT_OPTIONS = ["General", "Morning", "Evening", "Night"];
 const WORK_MODE_OPTIONS = ["Office", "Remote", "Hybrid"];
 
-const emptyForm = {
+interface FormState {
+  employee_id: string;
+  employee_name: string;
+  department: string;
+  designation: string;
+  date: string;
+  status: string;
+  check_in: string;
+  check_out: string;
+  shift: string;
+  work_mode: string;
+  remarks: string;
+}
+
+const emptyForm: FormState = {
   employee_id: "",
   employee_name: "",
   department: "",
@@ -37,9 +52,17 @@ const emptyForm = {
   remarks: "",
 };
 
-const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
-  const [records, setRecords] = useState([]);
-  const [employees, setEmployees] = useState([]);
+interface AttendanceWorkspaceProps {
+  resource: string;
+  title: string;
+  subtitle: string;
+  audienceLabel: string;
+}
+
+const AttendanceWorkspace: React.FC<AttendanceWorkspaceProps> = ({ resource, title, subtitle, audienceLabel }) => {
+  const { user } = useAuth();
+  const [records, setRecords] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -53,7 +76,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
   const [dateTo, setDateTo] = useState("");
   const [quickFilter, setQuickFilter] = useState("");
   const [localIp, setLocalIp] = useState("");
-  const [localCoords, setLocalCoords] = useState(null);
+  const [localCoords, setLocalCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [coordsLoading, setCoordsLoading] = useState(false);
 
   useEffect(() => {
@@ -84,7 +107,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     }
   }, []);
 
-  const getCoordinates = () => {
+  const getCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -107,25 +130,28 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
   };
 
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
 
-  const [todayRecord, setTodayRecord] = useState(null);
+  const todayStrRef = React.useRef(new Date().toISOString().slice(0, 10));
+  const [todayRecord, setTodayRecord] = useState<any>(null);
   const [punchWorkMode, setPunchWorkMode] = useState("Office");
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
   const [breakTimer, setBreakTimer] = useState("00:00:00");
 
   const loadTodayPunch = useCallback(async () => {
     try {
-      const res = await API.get("/data/attendance-employee/");
+      const selfEmployeeId = user?.employee_profile?.id;
+      if (!selfEmployeeId) return;
+      const res = await API.get(`/attendance-records/?employee_id=${selfEmployeeId}`);
       const list = normalizeResourceRecords(res.data);
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const found = list.find((r) => r.data?.date === todayStr);
+      const todayStr = todayStrRef.current;
+      const found = list.find((r: any) => r.data?.date === todayStr);
       setTodayRecord(found || null);
     } catch (error) {
       console.error("Failed to load today's punch status", error);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadTodayPunch();
@@ -150,7 +176,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
       if (diffMs < 0) diffMs = 0;
       
       let breakMs = 0;
-      const breaks = todayRecord.data?.breaks || [];
+      const breaks: any[] = todayRecord.data?.breaks || [];
       breaks.forEach((b) => {
         if (b.start) {
           const [sh, sm] = b.start.split(":").map(Number);
@@ -208,10 +234,10 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
         latitude: coords?.latitude || null,
         longitude: coords?.longitude || null,
       };
-      await API.post("/data/attendance-employee/", { data: payload });
+      await API.post("/attendance-records/", { data: payload });
       loadTodayPunch();
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to clock in", error);
       window.alert(error?.response?.data?.detail || "Unable to clock in.");
     } finally {
@@ -226,7 +252,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
       const payload = {
         action: "break_start",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadTodayPunch();
       loadData();
     } catch (error) {
@@ -244,7 +270,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
       const payload = {
         action: "break_end",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadTodayPunch();
       loadData();
     } catch (error) {
@@ -263,7 +289,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
       const payload = {
         check_out: "force_server_time",
       };
-      await API.put(`/data/attendance-employee/${todayRecord.id}/`, { data: payload });
+      await API.put(`/attendance-records/${todayRecord.id}/`, { data: payload });
       loadTodayPunch();
       loadData();
     } catch (error) {
@@ -277,8 +303,12 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const selfEmployeeId = user?.employee_profile?.id;
+      const fetchResource = audienceLabel === "Employee" && selfEmployeeId
+        ? `${resource}${resource.includes("?") ? "&" : "?"}employee_id=${selfEmployeeId}`
+        : resource;
       const [attendanceResponse, employeeDirectory] = await Promise.all([
-        API.get(resource),
+        API.get(fetchResource),
         fetchEmployeeDirectory(),
       ]);
       setRecords(normalizeResourceRecords(attendanceResponse.data));
@@ -290,7 +320,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     } finally {
       setLoading(false);
     }
-  }, [resource, title]);
+  }, [resource, title, user, audienceLabel]);
 
   useEffect(() => {
     loadData();
@@ -307,7 +337,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     resetForm();
   }, []);
 
-  const upsertEmployeeContext = (employeeId) => {
+  const upsertEmployeeContext = (employeeId: string) => {
     const employee = selectEmployee(employees, employeeId);
     if (!employee) {
       setForm((current) => ({
@@ -328,7 +358,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     setShowModal(true);
   };
 
-  const openEdit = (record) => {
+  const openEdit = (record: any) => {
     setEditing(record);
     setForm({
       employee_id: record.data?.employee_id ? String(record.data.employee_id) : "",
@@ -351,7 +381,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     setEditing(null);
   };
 
-  const persistRecord = async (event) => {
+  const persistRecord = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.employee_id || !form.date) {
       window.alert("Employee and attendance date are required.");
@@ -388,7 +418,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     }
   };
 
-  const removeRecord = async (id) => {
+  const removeRecord = async (id: number) => {
     if (!window.confirm("Delete this attendance entry?")) return;
     try {
       await API.delete(`${resource}${id}/`);
@@ -518,7 +548,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
     }));
   }, [filteredRecords]);
 
-  const selectedEmployee = useMemo(
+  const selEmployee = useMemo(
     () => selectEmployee(employees, form.employee_id),
     [employees, form.employee_id]
   );
@@ -538,7 +568,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                 <i className="ti ti-circle-plus me-2" />
                 Add Attendance
               </button>
-              <div className="head-icons">
+              <div className="ms-2 head-icons">
                 <CollapseHeader />
               </div>
             </>
@@ -779,7 +809,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn-sm btn-danger"
+                                  className="btn btn-sm btn-outline-danger"
                                   onClick={() => removeRecord(record.id)}
                                 >
                                   <i className="ti ti-trash" />
@@ -826,7 +856,7 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                           <div className="pulse-timer mb-2" style={{ fontFamily: "monospace", fontSize: "32px", fontWeight: "800", color: todayRecord.data?.on_break ? "#ea580c" : "#0284c7", letterSpacing: "1px" }}>
                             {todayRecord.data?.on_break ? breakTimer : elapsedTime}
                           </div>
-                          <p className="text-muted small mb-4">
+                          <div className="text-muted small mb-4">
                             {todayRecord.data?.on_break ? (
                               <span className="text-warning fw-bold d-block mb-1">
                                 <i className="ti ti-coffee me-1" /> Currently on Break
@@ -850,13 +880,13 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
                               <div className="alert alert-danger mt-3 py-2 px-3 mb-0 text-start" style={{ fontSize: "11.5px", borderRadius: "10px" }}>
                                 <i className="ti ti-alert-triangle me-1" /> <strong>Discrepancy Warning:</strong>
                                 <ul className="ps-3 mb-0 mt-1">
-                                  {todayRecord.data.discrepancy_reasons?.map((reason, idx) => (
+                                  {todayRecord.data.discrepancy_reasons?.map((reason: string, idx: number) => (
                                     <li key={idx}>{reason}</li>
                                   ))}
                                 </ul>
                               </div>
                             )}
-                          </p>
+                          </div>
                           <div className="d-flex gap-2 mb-3">
                             {todayRecord.data?.on_break ? (
                               <button
@@ -983,16 +1013,16 @@ const AttendanceWorkspace = ({ resource, title, subtitle, audienceLabel }) => {
         summary={
           <div className="payroll-summary-list">
             <div className="payroll-summary-highlight mb-3">
-              <small>{selectedEmployee?.name || "No employee selected"}</small>
+              <small>{selEmployee?.name || "No employee selected"}</small>
               <h3>{workHours.toFixed(1)} hrs</h3>
             </div>
             <div className="payroll-summary-row">
               <span>Department</span>
-              <strong>{selectedEmployee?.department || form.department || "-"}</strong>
+              <strong>{selEmployee?.department || form.department || "-"}</strong>
             </div>
             <div className="payroll-summary-row">
               <span>Designation</span>
-              <strong>{selectedEmployee?.designation || form.designation || "-"}</strong>
+              <strong>{selEmployee?.designation || form.designation || "-"}</strong>
             </div>
             <div className="payroll-summary-row">
               <span>Punctuality</span>

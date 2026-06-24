@@ -12,22 +12,37 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 import secrets
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# ---------------------------------------------------------------------------
+# SECURITY
+# ---------------------------------------------------------------------------
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-dev-key")
-
-# SECURITY WARNING: don't run with debug turned on in production!
+# In production, DJANGO_SECRET_KEY env var MUST be set — we never fall back.
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+_secret_key_env = os.getenv("DJANGO_SECRET_KEY", "")
+if not _secret_key_env:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY environment variable must be set in production. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+        )
+    # Development-only fallback: generate a fresh key per process start
+    _secret_key_env = "django-insecure-dev-" + secrets.token_hex(24)
+
+SECRET_KEY = _secret_key_env
+
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()
+]
 
 
 # Application definition
@@ -42,6 +57,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",  # Token blacklist for ROTATE_REFRESH_TOKENS
     "users",
     "employees",
     "payroll",
@@ -81,13 +97,54 @@ TEMPLATES = [
 WSGI_APPLICATION = "backend.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# ---------------------------------------------------------------------------
+# DATABASE
+# ---------------------------------------------------------------------------
+# Defaults to SQLite for development. Set DATABASE_URL or individual DB_*
+# env vars for PostgreSQL in production (strongly recommended).
+#
+# Production example:
+#   DATABASE_URL=postgres://hrms_user:password@localhost:5432/hrms_db
+#   or individually:
+#   DB_ENGINE=django.db.backends.postgresql
+#   DB_NAME=hrms_db  DB_USER=hrms_user  DB_PASSWORD=...  DB_HOST=localhost  DB_PORT=5432
+
+_db_engine = os.getenv("DB_ENGINE", "django.db.backends.sqlite3")
+_db_name = os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3"))
+_db_user = os.getenv("DB_USER", "")
+_db_password = os.getenv("DB_PASSWORD", "")
+_db_host = os.getenv("DB_HOST", "localhost")
+_db_port = os.getenv("DB_PORT", "5432")
+
+# Support DATABASE_URL style (postgres://user:pass@host:port/dbname)
+_database_url = os.getenv("DATABASE_URL", "")
+if _database_url:
+    import urllib.parse as _urlparse
+    _parsed = _urlparse.urlparse(_database_url)
+    _db_engine = {
+        "postgres": "django.db.backends.postgresql",
+        "postgresql": "django.db.backends.postgresql",
+        "sqlite": "django.db.backends.sqlite3",
+    }.get(_parsed.scheme, "django.db.backends.postgresql")
+    _db_name = _parsed.path.lstrip("/")
+    _db_user = _parsed.username or ""
+    _db_password = _parsed.password or ""
+    _db_host = _parsed.hostname or "localhost"
+    _db_port = str(_parsed.port or 5432)
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": _db_engine,
+        "NAME": _db_name,
+        "USER": _db_user,
+        "PASSWORD": _db_password,
+        "HOST": _db_host,
+        "PORT": _db_port,
+        "ATOMIC_REQUESTS": True,  # Wrap each request in a DB transaction
+        "OPTIONS": {
+            "connect_timeout": 10,
+        } if "postgresql" in _db_engine else {},
+        "CONN_MAX_AGE": 60 if "postgresql" in _db_engine else 0,  # Connection pooling
     }
 }
 
@@ -108,11 +165,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+# Set to IST (Indian Standard Time) for Palepu Pharma — timestamps display correctly
+TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = True  # Always True — stores in UTC, displays in TIME_ZONE
 
 
 # Static files (CSS, JavaScript, Images)
@@ -130,6 +188,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "users.CustomUser"
 
+# ---------------------------------------------------------------------------
+# DJANGO REST FRAMEWORK
+# ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -137,19 +198,85 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    # Task 1.5 — API Pagination: all list endpoints return paginated results
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+    # Standard response format for errors
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    # Throttling (rate limiting) — Task 1.6
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",     # Anonymous users (public endpoints)
+        "user": "300/min",   # Authenticated users
+        "auth": "10/min",    # Login / token endpoints
+        "otp": "5/min",      # OTP request endpoints
+    },
+    "DEFAULT_FILTER_BACKENDS": [
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
 }
 
+# ---------------------------------------------------------------------------
+# JWT CONFIGURATION — Task 1.3
+# ---------------------------------------------------------------------------
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    # Include role in token payload so frontend doesn't need extra API call
+    "TOKEN_OBTAIN_SERIALIZER": "users.auth_serializers.CustomTokenObtainPairSerializer",
+}
+
+# ---------------------------------------------------------------------------
+# CORS CONFIGURATION — Task 1.4
+# ---------------------------------------------------------------------------
+_cors_origins_env = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000"
+)
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    o.strip() for o in _cors_origins_env.split(",") if o.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = ["*"]
+
+# Restrict to specific headers only — no wildcard
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    o.strip() for o in _cors_origins_env.split(",") if o.strip()
 ]
 
 

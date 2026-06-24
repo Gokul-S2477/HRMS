@@ -220,18 +220,18 @@ class RolePermissionSmokeTests(TestCase):
 
         docs_response = self.client.get("/api/employee-documents/")
         self.assertEqual(docs_response.status_code, 200)
-        self.assertEqual(len(docs_response.data), 1)
-        self.assertEqual(docs_response.data[0]["employee"]["id"], self.employee_one.id)
+        self.assertEqual(len(docs_response.data["results"]), 1)
+        self.assertEqual(docs_response.data["results"][0]["employee"]["id"], self.employee_one.id)
 
         payroll_response = self.client.get("/api/employee-payroll/")
         self.assertEqual(payroll_response.status_code, 200)
-        self.assertEqual(len(payroll_response.data), 1)
-        self.assertEqual(payroll_response.data[0]["employee"]["id"], self.employee_one.id)
+        self.assertEqual(len(payroll_response.data["results"]), 1)
+        self.assertEqual(payroll_response.data["results"][0]["employee"]["id"], self.employee_one.id)
 
         tickets_response = self.client.get("/api/data/tickets/")
         self.assertEqual(tickets_response.status_code, 200)
-        self.assertEqual(len(tickets_response.data), 1)
-        self.assertEqual(str(tickets_response.data[0]["data"]["employee_id"]), str(self.employee_one.id))
+        self.assertEqual(len(tickets_response.data["results"]), 1)
+        self.assertEqual(str(tickets_response.data["results"][0]["data"]["employee_id"]), str(self.employee_one.id))
 
         recruitment_denied = self.client.get("/api/recruitment/jobs/")
         self.assertEqual(recruitment_denied.status_code, 403)
@@ -284,7 +284,7 @@ class RolePermissionSmokeTests(TestCase):
 
         docs_response = self.client.get("/api/employee-documents/")
         self.assertEqual(docs_response.status_code, 200)
-        self.assertEqual(len(docs_response.data), 2)
+        self.assertEqual(len(docs_response.data["results"]), 2)
 
         category_response = self.client.post(
             "/api/document-categories/",
@@ -324,7 +324,7 @@ class RolePermissionSmokeTests(TestCase):
 
         recruitment_response = self.client.get("/api/recruitment/jobs/")
         self.assertEqual(recruitment_response.status_code, 200)
-        self.assertEqual(len(recruitment_response.data), 1)
+        self.assertEqual(len(recruitment_response.data["results"]), 1)
 
         template_create_denied = self.client.post(
             "/api/onboarding/templates/",
@@ -345,7 +345,7 @@ class RolePermissionSmokeTests(TestCase):
 
         deals_response = self.client.get("/api/data/crm-deals/")
         self.assertEqual(deals_response.status_code, 200)
-        self.assertEqual(len(deals_response.data), 1)
+        self.assertEqual(len(deals_response.data["results"]), 1)
 
         create_denied = self.client.post(
             "/api/data/crm-deals/",
@@ -385,7 +385,7 @@ class RolePermissionSmokeTests(TestCase):
         # Verify employee scoping: Asha cannot view other employee's requests if created (and she can view hers)
         get_response = self.client.get("/api/data/profile-update-requests/")
         self.assertEqual(get_response.status_code, 200)
-        self.assertGreaterEqual(len(get_response.data), 1)
+        self.assertGreaterEqual(len(get_response.data["results"]), 1)
         
         # 2. HR views the approval inbox and sees the request
         self.auth(self.hr_user)
@@ -466,8 +466,8 @@ class RolePermissionSmokeTests(TestCase):
         # Verify employee can see their own signatures
         sig_list_response = self.client.get("/api/esign-signatures/")
         self.assertEqual(sig_list_response.status_code, 200)
-        self.assertEqual(len(sig_list_response.data), 1)
-        self.assertEqual(sig_list_response.data[0]["id"], asha_sig.id)
+        self.assertEqual(len(sig_list_response.data["results"]), 1)
+        self.assertEqual(sig_list_response.data["results"][0]["id"], asha_sig.id)
 
         # Try signing as employee
         sign_response = self.client.patch(

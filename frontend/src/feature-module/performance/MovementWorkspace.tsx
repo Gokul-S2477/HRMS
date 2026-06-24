@@ -17,7 +17,59 @@ import {
   selectEmployee,
   statusTone,
   toneClass,
+  dayDifference,
 } from "../hrm/hrmShared";
+
+interface MovementForm {
+  employee_id: string;
+  employee_name: string;
+  department: string;
+  designation_from: string;
+  designation_to: string;
+  promotion_date: string;
+  status: string;
+  change_reason: string;
+  salary_change: string | number;
+  notes: string;
+  reason: string;
+  notice_date: string;
+  resignation_date: string;
+  handover_status: string;
+  termination_type: string;
+  termination_date: string;
+  settlement_status: string;
+}
+
+interface MovementRecord {
+  id: string;
+  data?: {
+    employee_id?: string | number;
+    employee_name?: string;
+    department?: string;
+    designation_from?: string;
+    designation_to?: string;
+    promotion_date?: string;
+    status?: string;
+    change_reason?: string;
+    salary_change?: string | number;
+    notes?: string;
+    reason?: string;
+    notice_date?: string;
+    resignation_date?: string;
+    handover_status?: string;
+    termination_type?: string;
+    termination_date?: string;
+    settlement_status?: string;
+    [key: string]: any;
+  };
+}
+
+interface EmployeeDirectoryItem {
+  id: string | number;
+  name: string;
+  department?: string;
+  designation?: string;
+}
 
 const MODE_CONFIG = {
   promotion: {
@@ -28,7 +80,7 @@ const MODE_CONFIG = {
     emptyDescription: "Track internal growth decisions with effective dates and compensation notes.",
     statusOptions: ["Planned", "Approved", "Completed"],
     reasonOptions: ["Career Growth", "Performance Reward", "Internal Mobility"],
-    primaryDateKey: "promotion_date",
+    primaryDateKey: "promotion_date" as const,
     primaryDateLabel: "Promotion Date",
   },
   resignation: {
@@ -39,7 +91,7 @@ const MODE_CONFIG = {
     emptyDescription: "Capture notice windows, handovers, and final exit dates in one place.",
     statusOptions: ["Submitted", "Accepted", "Completed"],
     reasonOptions: ["Career Change", "Relocation", "Personal Reasons", "Further Study"],
-    primaryDateKey: "resignation_date",
+    primaryDateKey: "resignation_date" as const,
     primaryDateLabel: "Resignation Date",
   },
   termination: {
@@ -50,12 +102,12 @@ const MODE_CONFIG = {
     emptyDescription: "Track formal termination workflows, notice dates, and settlement progress.",
     statusOptions: ["Review", "Approved", "Completed"],
     reasonOptions: ["Retirement", "Layoff", "Insubordination", "Breach of Contract", "Lack of Skills", "Other"],
-    primaryDateKey: "termination_date",
+    primaryDateKey: "termination_date" as const,
     primaryDateLabel: "Termination Date",
   },
 };
 
-const buildEmptyForm = (mode) => {
+const buildEmptyForm = (mode: "promotion" | "resignation" | "termination") => {
   if (mode === "promotion") {
     return {
       employee_id: "",
@@ -68,6 +120,13 @@ const buildEmptyForm = (mode) => {
       change_reason: "Career Growth",
       salary_change: "",
       notes: "",
+      reason: "",
+      notice_date: "",
+      resignation_date: "",
+      handover_status: "",
+      termination_type: "",
+      termination_date: "",
+      settlement_status: "",
     };
   }
   if (mode === "resignation") {
@@ -80,7 +139,15 @@ const buildEmptyForm = (mode) => {
       resignation_date: "",
       status: "Submitted",
       handover_status: "Pending",
+      designation_from: "",
+      designation_to: "",
+      promotion_date: "",
+      change_reason: "",
+      salary_change: "",
       notes: "",
+      termination_type: "",
+      termination_date: "",
+      settlement_status: "",
     };
   }
   return {
@@ -94,13 +161,27 @@ const buildEmptyForm = (mode) => {
     settlement_status: "Pending",
     reason: "",
     notes: "",
+    designation_from: "",
+    designation_to: "",
+    promotion_date: "",
+    change_reason: "",
+    salary_change: "",
+    resignation_date: "",
+    handover_status: "",
   };
 };
 
-const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
+interface MovementWorkspaceProps {
+  mode: "promotion" | "resignation" | "termination";
+  resource: string;
+  title: string;
+  subtitle: string;
+}
+
+const MovementWorkspace: React.FC<MovementWorkspaceProps> = ({ mode, resource, title, subtitle }) => {
   const config = MODE_CONFIG[mode];
-  const [records, setRecords] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  const [records, setRecords] = useState<MovementRecord[]>([]);
+  const [employees, setEmployees] = useState<EmployeeDirectoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -112,8 +193,8 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
   const [dateTo, setDateTo] = useState("");
   const [quickFilter, setQuickFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(buildEmptyForm(mode));
+  const [editing, setEditing] = useState<MovementRecord | null>(null);
+  const [form, setForm] = useState<MovementForm>(buildEmptyForm(mode));
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -122,8 +203,8 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
         API.get(resource),
         fetchEmployeeDirectory(),
       ]);
-      setRecords(normalizeResourceRecords(recordResponse.data));
-      setEmployees(employeeDirectory);
+      setRecords(normalizeResourceRecords(recordResponse.data) as MovementRecord[]);
+      setEmployees(employeeDirectory as EmployeeDirectoryItem[]);
     } catch (error) {
       console.error(`Failed to load ${mode} records`, error);
       setRecords([]);
@@ -153,7 +234,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
     setShowModal(true);
   };
 
-  const openEdit = (record) => {
+  const openEdit = (record: MovementRecord) => {
     setEditing(record);
     setForm({
       ...buildEmptyForm(mode),
@@ -168,7 +249,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
     setEditing(null);
   };
 
-  const updateEmployeeContext = (employeeId) => {
+  const updateEmployeeContext = (employeeId: string) => {
     const employee = selectEmployee(employees, employeeId);
     if (!employee) {
       setForm((current) => ({ ...current, employee_id: employeeId }));
@@ -181,7 +262,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
     }));
   };
 
-  const saveRecord = async (event) => {
+  const saveRecord = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.employee_id) {
       window.alert("Select an employee first.");
@@ -212,7 +293,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
     }
   };
 
-  const deleteRecord = async (id) => {
+  const deleteRecord = async (id: string) => {
     if (!window.confirm(`Delete this ${mode} record?`)) return;
     try {
       await API.delete(`${resource}${id}/`);
@@ -323,6 +404,13 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
     ? ["Employee", "Reason", "Notice Date", "Exit Date", "Handover", "Status", "Actions"]
     : ["Employee", "Type", "Notice Date", "Exit Date", "Settlement", "Status", "Actions"];
 
+  const primaryDateKey = config.primaryDateKey;
+
+  const dateSpan =
+    form[primaryDateKey] && dayDifference(new Date().toISOString().slice(0, 10), form[primaryDateKey]) !== null
+      ? dayDifference(new Date().toISOString().slice(0, 10), form[primaryDateKey])
+      : null;
+
   return (
     <div className="page-wrapper">
       <div className="content container-fluid payroll-shell employee-shell">
@@ -378,7 +466,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
                   >
                     <option value="">All employees</option>
                     {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
+                      <option key={employee.id} value={String(employee.id)}>
                         {employee.name}
                       </option>
                     ))}
@@ -616,6 +704,12 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
                 <strong>{form.settlement_status || "Pending"}</strong>
               </div>
             ) : null}
+            {dateSpan !== null ? (
+              <div className="payroll-summary-row">
+                <span>Timeline Span</span>
+                <strong>{dateSpan === 0 ? "Effective today" : `${dateSpan} days`}</strong>
+              </div>
+            ) : null}
           </div>
         }
       >
@@ -635,7 +729,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
                 >
                   <option value="">Select employee</option>
                   {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
+                    <option key={employee.id} value={String(employee.id)}>
                       {employee.name} • {employee.department || "No department"}
                     </option>
                   ))}
@@ -694,7 +788,7 @@ const MovementWorkspace = ({ mode, resource, title, subtitle }) => {
                       min="0"
                       className="form-control"
                       value={form.salary_change || ""}
-                      onChange={(event) => setForm((current) => ({ ...current, salary_change: event.target.value }))}
+                      onChange={(event) => setForm((current) => ({ ...current, salary_change: Number(event.target.value) || 0 }))}
                       placeholder="2500"
                     />
                   </div>

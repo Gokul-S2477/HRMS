@@ -245,3 +245,61 @@ class FinalSettlement(models.Model):
 
     def __str__(self) -> str:
         return f"Settlement:{self.employee_id}:{self.status}"
+
+
+class EmployeeLoan(models.Model):
+    LOAN_TYPES = [
+        ("advance", "Advance"),
+        ("personal_loan", "Personal Loan"),
+        ("vehicle_loan", "Vehicle Loan"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("active", "Active"),
+        ("closed", "Closed"),
+        ("rejected", "Rejected"),
+    ]
+    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE, related_name="loans")
+    loan_type = models.CharField(max_length=30, choices=LOAN_TYPES, default="personal_loan")
+    principal_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    sanctioned_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    total_installments = models.IntegerField(default=12)
+    installments_paid = models.IntegerField(default=0)
+    monthly_emi = models.DecimalField(max_digits=12, decimal_places=2)
+    start_date = models.DateField()
+    end_date = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_loans")
+    sanctioned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="sanctioned_loans")
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.employee.first_name} - {self.loan_type} ({self.sanctioned_amount})"
+
+
+class LoanInstallment(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("deducted", "Deducted"),
+        ("waived", "Waived"),
+    ]
+    loan = models.ForeignKey(EmployeeLoan, on_delete=models.CASCADE, related_name="installments")
+    month = models.CharField(max_length=20)
+    year = models.IntegerField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("loan", "month", "year")
+
+    def __str__(self) -> str:
+        return f"{self.loan.employee.first_name} - Installment {self.month} {self.year} ({self.amount})"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from .models import ApplicantAccount, ApplicantLoginCode, ApplicantSession, JobApplication, RecruitmentJob
@@ -21,6 +23,16 @@ from .workflow_services import (
     sync_candidate_from_application,
 )
 
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Throttle classes for public endpoints  (Task 1.6)
+# ---------------------------------------------------------------------------
+
+class OTPRequestThrottle(AnonRateThrottle):
+    """5 OTP requests per minute per IP — prevents brute force on applicant login."""
+    scope = "otp"
 
 def as_decimal(value) -> Decimal:
     try:
@@ -124,8 +136,10 @@ class PublicRecruitmentJobDetailView(APIView):
 
 
 class ApplicantLoginRequestView(APIView):
+    """Issues OTP login code to applicant email. Rate-limited to 5/min per IP."""
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [OTPRequestThrottle]  # Task 1.6 — OTP rate limit
 
     def post(self, request):
         email = normalize_email(request.data.get("email"))
@@ -144,12 +158,17 @@ class ApplicantLoginRequestView(APIView):
             target_id=str(applicant.id),
             summary=f"Applicant code requested for {email}",
         )
+        # Task 2.3 — Log OTP to console for dev/testing (no email integration yet)
+        # TODO: Replace logger.debug with SMTP email when email integration is added
+        logger.debug("[APPLICANT OTP] Email: %s | Code: %s | Expires: %s", email, code.code, code.expires_at)
         response_payload = {
             "status": "code_sent",
-            "message": "A sign-in code was issued for this applicant email.",
+            "message": "A sign-in code has been issued. Check application logs.",
             "email": email,
         }
-        response_payload["debug_code"] = code.code
+        # Only expose debug_code in DEBUG mode — never in production
+        if getattr(settings, "DEBUG", False):
+            response_payload["debug_code"] = code.code
         return Response(response_payload)
 
 

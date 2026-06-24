@@ -138,10 +138,27 @@ const CrudOpsWorkspace = ({
     setSaving(true);
     try {
       const payload = buildPayload ? buildPayload(form, dependencies, editing) : form;
-      if (editing) {
-        await API.put(`${endpoint}${editing.id}/`, payload);
+
+      const hasFile = Object.values(payload).some((val) => val instanceof File);
+      if (hasFile) {
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, val]) => {
+          if (val !== null && val !== undefined) {
+            formData.append(key, val);
+          }
+        });
+        if (editing) {
+          formData.append("id", editing.id);
+        }
+        await API.post("/employee-documents/upload/", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        await API.post(endpoint, payload);
+        if (editing) {
+          await API.put(`${endpoint}${editing.id}/`, payload);
+        } else {
+          await API.post(endpoint, payload);
+        }
       }
       closeModal();
       load();
@@ -218,6 +235,20 @@ const CrudOpsWorkspace = ({
       return <textarea {...commonProps} rows={field.rows || 4} />;
     }
 
+    if (field.type === "file") {
+      return (
+        <input
+          type="file"
+          className="form-control"
+          onChange={(event) => {
+            const file = event.target.files ? event.target.files[0] : null;
+            setForm((current) => ({ ...current, [field.name]: file }));
+          }}
+          required={Boolean(field.required && !editing)}
+        />
+      );
+    }
+
     if (field.type === "select") {
       return (
         <select className="form-select" value={form[field.name] ?? ""} onChange={(event) => setForm((current) => ({ ...current, [field.name]: event.target.value }))} required={Boolean(field.required)}>
@@ -266,7 +297,19 @@ const CrudOpsWorkspace = ({
           </span>
         </HrmHero>
 
-        {children}
+        {typeof children === "function"
+          ? children({
+              records,
+              filteredRecords,
+              dependencies,
+              refresh: load,
+              openEdit,
+              openCreate,
+              deleteRecord,
+              loading,
+              saving,
+            })
+          : children}
 
         {!hideDefaultLayout && (
           <div className="row g-4">

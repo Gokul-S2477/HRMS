@@ -4,6 +4,22 @@ import { useAuth } from "../../core/auth/AuthContext";
 import CrudOpsWorkspace from "../liveops/CrudOpsWorkspace";
 import { fetchJobOptions } from "../liveops/liveHelpers";
 
+interface ReferralRecord {
+  id: number;
+  candidate_name: string;
+  candidate_email?: string;
+  referrer_name: string;
+  referrer_email?: string;
+  job?: {
+    id: number;
+    title: string;
+  };
+  reward_status?: string;
+  status: string;
+  notes?: string;
+  referred_on?: string;
+}
+
 const STATUS_OPTIONS = [
   { value: "new", label: "New" },
   { value: "reviewing", label: "Reviewing" },
@@ -25,14 +41,48 @@ const fields = [
 ];
 
 const columns = [
-  { label: "Candidate", render: (record) => <div><div className="fw-semibold">{record.candidate_name}</div><div className="text-muted small">{record.candidate_email || "Email not shared"}</div></div>, text: (record) => record.candidate_name },
-  { label: "Referrer", render: (record) => <div><div>{record.referrer_name}</div><div className="text-muted small">{record.referrer_email || "-"}</div></div>, text: (record) => record.referrer_name },
-  { label: "Job", render: (record) => record.job?.title || "General talent pool", text: (record) => record.job?.title || "General talent pool" },
-  { label: "Status", render: (record) => <span className={`payroll-badge ${record.status === "converted" ? "success" : record.status === "declined" ? "danger" : "warning"}`}>{record.status}</span>, text: (record) => record.status },
-  { label: "Reward", render: (record) => record.reward_status || "pending", text: (record) => record.reward_status || "pending" },
+  {
+    label: "Candidate",
+    render: (record: ReferralRecord) => (
+      <div>
+        <div className="fw-semibold">{record.candidate_name}</div>
+        <div className="text-muted small">{record.candidate_email || "Email not shared"}</div>
+      </div>
+    ),
+    text: (record: ReferralRecord) => record.candidate_name,
+  },
+  {
+    label: "Referrer",
+    render: (record: ReferralRecord) => (
+      <div>
+        <div>{record.referrer_name}</div>
+        <div className="text-muted small">{record.referrer_email || "-"}</div>
+      </div>
+    ),
+    text: (record: ReferralRecord) => record.referrer_name,
+  },
+  {
+    label: "Job",
+    render: (record: ReferralRecord) => record.job?.title || "General talent pool",
+    text: (record: ReferralRecord) => record.job?.title || "General talent pool",
+  },
+  {
+    label: "Status",
+    render: (record: ReferralRecord) => (
+      <span className={`payroll-badge ${record.status === "converted" ? "success" : record.status === "declined" ? "danger" : "warning"}`}>
+        {record.status}
+      </span>
+    ),
+    text: (record: ReferralRecord) => record.status,
+  },
+  {
+    label: "Reward",
+    render: (record: ReferralRecord) => record.reward_status || "pending",
+    text: (record: ReferralRecord) => record.reward_status || "pending",
+  },
 ];
 
-const ReferralsPage = () => {
+const ReferralsPage: React.FC = () => {
   const { role } = useAuth();
   const stakeholderView = role === "stakeholder";
 
@@ -55,9 +105,19 @@ const ReferralsPage = () => {
       allowCreate={!stakeholderView}
       allowEdit={!stakeholderView}
       canDelete={!stakeholderView}
-      defaultForm={{ job_id: "", candidate_name: "", candidate_email: "", referrer_name: "", referrer_email: "", reward_status: "pending", status: "new", referred_on: "", notes: "" }}
+      defaultForm={{
+        job_id: "",
+        candidate_name: "",
+        candidate_email: "",
+        referrer_name: "",
+        referrer_email: "",
+        reward_status: "pending",
+        status: "new",
+        referred_on: "",
+        notes: "",
+      }}
       loadDependencies={async () => ({ jobOptions: await fetchJobOptions() })}
-      statsBuilder={(records) => {
+      statsBuilder={(records: ReferralRecord[]) => {
         const converted = records.filter((item) => item.status === "converted").length;
         const active = records.filter((item) => ["new", "reviewing", "accepted"].includes(item.status)).length;
         return [

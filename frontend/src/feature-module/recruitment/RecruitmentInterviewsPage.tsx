@@ -19,6 +19,70 @@ import {
 import { fetchCandidateOptions, fetchEmployeeOptions, fetchJobOptions, normalizeList } from "../liveops/liveHelpers";
 import { splitCommaValues } from "../liveops/productivityShared";
 
+interface CandidateOption {
+  value: string | number;
+  label: string;
+}
+
+interface JobOption {
+  value: string | number;
+  label: string;
+}
+
+interface EmployeeOption {
+  value: string | number;
+  label: string;
+}
+
+interface InterviewRecord {
+  id: number;
+  candidate?: {
+    id: number;
+    full_name?: string;
+    employee?: {
+      id: number;
+      full_name?: string;
+      emp_code?: string;
+    } | null;
+  };
+  job?: {
+    id: number;
+    title?: string;
+  };
+  employee?: {
+    id: number;
+    emp_code?: string;
+    full_name?: string;
+  };
+  round_name?: string;
+  interview_type?: string;
+  scheduled_for?: string;
+  completed_at?: string;
+  mode?: string;
+  location_or_link?: string;
+  duration_minutes?: number;
+  taken_by?: {
+    display_name?: string;
+    username?: string;
+  };
+  taken_by_role?: string;
+  decision?: string;
+  status?: string;
+  score?: number;
+  salary_discussed?: boolean;
+  salary_expectation?: number;
+  salary_offered?: number;
+  final_ctc_recommended?: number;
+  panel_members?: string[];
+  discussion_topics?: string[];
+  feedback_summary?: string;
+  strengths?: string;
+  concerns?: string;
+  negotiation_notes?: string;
+  next_step?: string;
+  created_at?: string;
+}
+
 const INTERVIEW_TYPES = [
   { value: "screening", label: "Screening" },
   { value: "technical", label: "Technical" },
@@ -49,7 +113,7 @@ const MODE_OPTIONS = [
   { value: "panel", label: "Panel" },
 ];
 
-const toneForDecision = (value) => {
+const toneForDecision = (value?: string): "success" | "danger" | "warning" => {
   const key = String(value || "hold").toLowerCase();
   if (key === "strong_hire" || key === "hire") return "success";
   if (key === "reject") return "danger";
@@ -81,18 +145,18 @@ const defaultForm = {
   next_step: "",
 };
 
-const RecruitmentInterviewsPage = () => {
+const RecruitmentInterviewsPage: React.FC = () => {
   const location = useLocation();
   const queryCandidate = useMemo(() => new URLSearchParams(location.search).get("candidate") || "", [location.search]);
 
-  const [interviews, setInterviews] = useState([]);
-  const [candidateOptions, setCandidateOptions] = useState([]);
-  const [jobOptions, setJobOptions] = useState([]);
-  const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [interviews, setInterviews] = useState<InterviewRecord[]>([]);
+  const [candidateOptions, setCandidateOptions] = useState<CandidateOption[]>([]);
+  const [jobOptions, setJobOptions] = useState<JobOption[]>([]);
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<InterviewRecord | null>(null);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -160,7 +224,7 @@ const RecruitmentInterviewsPage = () => {
   const stats = useMemo(() => {
     const completed = filteredInterviews.filter((item) => item.status === "completed").length;
     const scheduled = filteredInterviews.filter((item) => item.status === "scheduled").length;
-    const hireSignals = filteredInterviews.filter((item) => ["strong_hire", "hire"].includes(item.decision)).length;
+    const hireSignals = filteredInterviews.filter((item) => ["strong_hire", "hire"].includes(item.decision || "")).length;
     const linkedEmployees = filteredInterviews.filter((item) => item.employee?.id).length;
     return [
       { label: "Interview Records", value: filteredInterviews.length, meta: "Every round stays searchable later" },
@@ -178,8 +242,8 @@ const RecruitmentInterviewsPage = () => {
         .slice(0, 6)
         .map((item) => ({
           label: item.candidate?.full_name || "Candidate",
-          meta: `${item.round_name || item.interview_type} · ${item.job?.title || "Role pending"}`,
-          value: item.decision?.replace(/_/g, " ") || item.status,
+          meta: `${item.round_name || item.interview_type} Â· ${item.job?.title || "Role pending"}`,
+          value: item.decision?.replace(/_/g, " ") || item.status || "",
           tone: toneForDecision(item.decision),
         })),
     [filteredInterviews]
@@ -202,7 +266,7 @@ const RecruitmentInterviewsPage = () => {
     setShowModal(true);
   };
 
-  const openEdit = (record) => {
+  const openEdit = (record: InterviewRecord) => {
     setEditing(record);
     setForm({
       candidate_id: String(record.candidate?.id || ""),
@@ -231,7 +295,7 @@ const RecruitmentInterviewsPage = () => {
     setShowModal(true);
   };
 
-  const saveInterview = async (event) => {
+  const saveInterview = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
     try {
@@ -266,7 +330,7 @@ const RecruitmentInterviewsPage = () => {
       }
       closeModal();
       load();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save interview", error);
       window.alert(error?.response?.data?.detail || "Unable to save interview record.");
     } finally {
@@ -274,7 +338,7 @@ const RecruitmentInterviewsPage = () => {
     }
   };
 
-  const deleteInterview = async (record) => {
+  const deleteInterview = async (record: InterviewRecord) => {
     if (!window.confirm(`Delete the interview record for ${record.candidate?.full_name || "this candidate"}?`)) return;
     try {
       await API.delete(`/recruitment/interviews/${record.id}/`);
@@ -382,12 +446,17 @@ const RecruitmentInterviewsPage = () => {
                             <td>
                               <div className="fw-semibold">{record.candidate?.full_name || "Candidate"}</div>
                               <div className="text-muted small">{record.job?.title || "Role pending"}</div>
-                              <div className="text-muted small">{record.employee?.emp_code ? `${record.employee.emp_code} · ${record.employee.full_name}` : "Not yet linked to employee"}</div>
+                              <div className="text-muted small">
+                                {record.candidate && (interviews.find(i => i.candidate?.id === record.candidate?.id)?.employee?.emp_code)
+                                  ? `${interviews.find(i => i.candidate?.id === record.candidate?.id)?.employee?.emp_code} Â· ${interviews.find(i => i.candidate?.id === record.candidate?.id)?.employee?.full_name}`
+                                  : "Not yet linked to employee"
+                                }
+                              </div>
                             </td>
                             <td>
                               <div className="fw-semibold">{record.round_name || record.interview_type}</div>
                               <div className="text-muted small">{formatDateTimeLabel(record.completed_at || record.scheduled_for)}</div>
-                              <div className="text-muted small text-capitalize">{record.mode || "virtual"} · {record.duration_minutes || 45} min</div>
+                              <div className="text-muted small text-capitalize">{record.mode || "virtual"} Â· {record.duration_minutes || 45} min</div>
                             </td>
                             <td>
                               <div>{record.taken_by?.display_name || record.taken_by?.username || "System"}</div>
@@ -491,11 +560,11 @@ const RecruitmentInterviewsPage = () => {
                 </div>
                 <div className="col-md-4">
                   <label className="form-label">Duration</label>
-                  <input type="number" min={15} className="form-control" value={form.duration_minutes} onChange={(event) => setForm((current) => ({ ...current, duration_minutes: event.target.value }))} />
+                  <input type="number" min={15} className="form-control" value={form.duration_minutes} onChange={(event) => setForm((current) => ({ ...current, duration_minutes: Number(event.target.value) || 0 }))} />
                 </div>
                 <div className="col-md-4">
                   <label className="form-label">Score / 100</label>
-                  <input type="number" min={0} max={100} className="form-control" value={form.score} onChange={(event) => setForm((current) => ({ ...current, score: event.target.value }))} />
+                  <input type="number" min={0} max={100} className="form-control" value={form.score} onChange={(event) => setForm((current) => ({ ...current, score: Number(event.target.value) || 0 }))} />
                 </div>
                 <div className="col-12">
                   <label className="form-label">Meeting link or location</label>
@@ -530,15 +599,15 @@ const RecruitmentInterviewsPage = () => {
                 </div>
                 <div className="col-md-3">
                   <label className="form-label">Expected CTC</label>
-                  <input type="number" min={0} className="form-control" value={form.salary_expectation} onChange={(event) => setForm((current) => ({ ...current, salary_expectation: event.target.value }))} />
+                  <input type="number" min={0} className="form-control" value={form.salary_expectation} onChange={(event) => setForm((current) => ({ ...current, salary_expectation: Number(event.target.value) || 0 }))} />
                 </div>
                 <div className="col-md-3">
                   <label className="form-label">Offered CTC</label>
-                  <input type="number" min={0} className="form-control" value={form.salary_offered} onChange={(event) => setForm((current) => ({ ...current, salary_offered: event.target.value }))} />
+                  <input type="number" min={0} className="form-control" value={form.salary_offered} onChange={(event) => setForm((current) => ({ ...current, salary_offered: Number(event.target.value) || 0 }))} />
                 </div>
                 <div className="col-md-3">
                   <label className="form-label">Recommended CTC</label>
-                  <input type="number" min={0} className="form-control" value={form.final_ctc_recommended} onChange={(event) => setForm((current) => ({ ...current, final_ctc_recommended: event.target.value }))} />
+                  <input type="number" min={0} className="form-control" value={form.final_ctc_recommended} onChange={(event) => setForm((current) => ({ ...current, final_ctc_recommended: Number(event.target.value) || 0 }))} />
                 </div>
                 <div className="col-12">
                   <label className="form-label">Negotiation notes</label>

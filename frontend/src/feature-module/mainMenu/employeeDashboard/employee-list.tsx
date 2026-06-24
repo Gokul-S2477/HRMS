@@ -235,6 +235,9 @@ const EmployeeList: React.FC = () => {
               </div>
               <div className="col-lg-4">
                 <div className="payroll-hero-actions">
+                  <button className="btn btn-white" type="button" onClick={() => navigate(all_routes.employeeBulkImport)}>
+                    <i className="ti ti-upload me-1" /> Import CSV
+                  </button>
                   <button className="btn btn-white" type="button" onClick={() => navigate(all_routes.employeeGrid)}>
                     <i className="ti ti-layout-grid me-1" /> Grid View
                   </button>
