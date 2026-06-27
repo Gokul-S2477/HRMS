@@ -43,7 +43,7 @@ const Policies: React.FC = () => {
     (async () => {
       try {
         const response = await API.get("/departments/");
-        setDepartments(Array.isArray(response.data) ? response.data : []);
+        setDepartments(Array.isArray(response.data) ? response.data : response.data?.results || []);
       } catch (error) {
         console.error("Failed to load departments", error);
       }
@@ -61,7 +61,7 @@ const Policies: React.FC = () => {
           to: toDate || undefined,
         },
       });
-      setPolicies(Array.isArray(response.data) ? response.data : []);
+      setPolicies(Array.isArray(response.data) ? response.data : response.data?.results || []);
     } catch (error) {
       console.error("Failed to load policies", error);
       setPolicies([]);

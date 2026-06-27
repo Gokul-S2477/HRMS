@@ -121,6 +121,7 @@ import ESignDesk from "../liveops/ESignDesk";
 import ESignWorkspace from "../liveops/ESignWorkspace";
 import ReportsWorkspace from "../liveops/ReportsWorkspace";
 import SettingsControlCenter from "../liveops/SettingsControlCenter";
+import LeaveType from "../settings/appSettings/leave-type";
 import ProductivityNotesPage from "../liveops/ProductivityNotesPage";
 import ProductivityTodosPage from "../liveops/ProductivityTodosPage";
 import ProductivityEventsPage from "../liveops/ProductivityEventsPage";
@@ -307,5 +308,49 @@ export const protectedRoutes = [
 
   { path: routes.approvalSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
   { path: routes.notificationssettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
-  { path: routes.leaveType, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.leaveType, element: <LeaveType />, allowedRoles: HR_ALLOWED },
+
+  // General Settings routes
+  { path: routes.profilesettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.securitysettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.connectedApps, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+
+  // Website Settings routes
+  { path: routes.bussinessSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.seoSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.localizationSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.prefixes, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.preference, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.appearance, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.authenticationSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.aiSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+
+  // App Settings routes
+  { path: routes.salarySettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.customFields, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.invoiceSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+
+  // System Settings routes
+  { path: routes.emailSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.emailTemplates, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.gdprCookies, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.smsSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.smsTemplate, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.otpSettings, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.maintenanceMode, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+
+  // Financial Settings routes
+  { path: routes.currencies, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.paymentGateways, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.taxRates, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+
+  // Other Settings routes
+  { path: routes.banIpAddress, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.customCss, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.customJs, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.cronjob, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.Cronjobschedule, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.storage, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.backup, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
+  { path: routes.clearcache, element: <SettingsControlCenter />, allowedRoles: HR_ALLOWED },
 ];

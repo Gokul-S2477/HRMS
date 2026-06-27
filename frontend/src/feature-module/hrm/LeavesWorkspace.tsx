@@ -134,6 +134,9 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
   const [form, setForm] = useState<LeaveForm>(emptyForm);
   const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"requests" | "ledger">("requests");
+  const [reviewEmployeeDetail, setReviewEmployeeDetail] = useState<any>(null);
+  const [reviewLeaveBalances, setReviewLeaveBalances] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -177,7 +180,7 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
     setShowModal(true);
   };
 
-  const openEdit = (record: LeaveRecord) => {
+  const openEdit = async (record: LeaveRecord) => {
     setEditing(record);
     setForm({
       ...emptyForm,
@@ -185,11 +188,35 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
       employee_id: record.data?.employee_id ? String(record.data.employee_id) : "",
     });
     setShowModal(true);
+    // Fetch employee detail + leave balances for the reviewer panel
+    if (canReview && record.data?.employee_id) {
+      setLoadingDetail(true);
+      setReviewEmployeeDetail(null);
+      setReviewLeaveBalances([]);
+      try {
+        const empId = record.data.employee_id;
+        const [empRes, balRes] = await Promise.all([
+          API.get(`/employees/${empId}/`).catch(() => null),
+          API.get(`/leave-balances/?employee=${empId}`).catch(() => null),
+        ]);
+        if (empRes) setReviewEmployeeDetail(empRes.data);
+        if (balRes) {
+          const bals = Array.isArray(balRes.data) ? balRes.data : balRes.data?.results || [];
+          setReviewLeaveBalances(bals);
+        }
+      } catch (e) {
+        console.error("Failed to load employee detail for review", e);
+      } finally {
+        setLoadingDetail(false);
+      }
+    }
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditing(null);
+    setReviewEmployeeDetail(null);
+    setReviewLeaveBalances([]);
   };
 
   const saveRecord = async (event: React.FormEvent) => {
@@ -758,6 +785,87 @@ const LeavesWorkspace: React.FC<LeavesWorkspaceProps> = ({
           </div>
         }
       >
+        {/* Employee Info Panel — visible only in approval mode */}
+        {canReview && editing && (
+          <div className="card payroll-section-card mb-3" style={{ background: "var(--bs-light)" }}>
+            <div className="card-body py-3">
+              <h6 className="payroll-section-title mb-3">
+                <i className="ti ti-user-check me-2 text-primary" />
+                Employee Leave Summary
+              </h6>
+              {loadingDetail ? (
+                <div className="text-center py-2"><span className="spinner-border spinner-border-sm" /></div>
+              ) : (
+                <div className="row g-3">
+                  <div className="col-md-3">
+                    <div className="payroll-summary-row flex-column align-items-start">
+                      <span className="text-muted small">Employee</span>
+                      <strong>{reviewEmployeeDetail?.first_name ? `${reviewEmployeeDetail.first_name} ${reviewEmployeeDetail.last_name || ""}`.trim() : (form.employee_name || "—")}</strong>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="payroll-summary-row flex-column align-items-start">
+                      <span className="text-muted small">Designation</span>
+                      <strong>{reviewEmployeeDetail?.designation_title || reviewEmployeeDetail?.designation?.title || "—"}</strong>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="payroll-summary-row flex-column align-items-start">
+                      <span className="text-muted small">Date of Joining</span>
+                      <strong>
+                        {reviewEmployeeDetail?.date_of_joining
+                          ? new Date(reviewEmployeeDetail.date_of_joining).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                          : "—"}
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="col-md-3">
+                    <div className="payroll-summary-row flex-column align-items-start">
+                      <span className="text-muted small">Days Requested</span>
+                      <strong className="text-primary">
+                        {leaveDays(form.from_date, form.to_date)} day(s) — {form.leave_type}
+                      </strong>
+                    </div>
+                  </div>
+                  {/* Leave balance per type */}
+                  {reviewLeaveBalances.length > 0 && (
+                    <div className="col-12">
+                      <div className="text-muted small mb-2">Leave Balance This Year</div>
+                      <div className="d-flex flex-wrap gap-2">
+                        {reviewLeaveBalances.map((bal: any, idx: number) => {
+                          const avail = Number(bal.available || 0);
+                          const used = Number(bal.used || 0);
+                          const pending = Number(bal.pending || 0);
+                          const isCurrentType = (bal.leave_type || "").toLowerCase().includes((form.leave_type || "").toLowerCase().slice(0, 4));
+                          return (
+                            <div
+                              key={idx}
+                              className={`px-3 py-2 rounded-3 border ${isCurrentType ? "border-primary bg-primary-subtle" : "bg-white"}`}
+                              style={{ minWidth: 130 }}
+                            >
+                              <div className="fw-semibold small mb-1">{bal.leave_type}</div>
+                              <div className="d-flex gap-2 small">
+                                <span className="text-success"><i className="ti ti-circle-check" /> {avail} left</span>
+                                <span className="text-danger"><i className="ti ti-circle-minus" /> {used} used</span>
+                              </div>
+                              {pending > 0 && <div className="text-warning small"><i className="ti ti-clock" /> {pending} pending</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {reviewLeaveBalances.length === 0 && !loadingDetail && (
+                    <div className="col-12">
+                      <span className="text-muted small">No leave balance data available for this employee.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="card payroll-section-card">
           <div className="card-body">
             <div className="payroll-section-header">

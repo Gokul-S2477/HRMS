@@ -67,14 +67,39 @@ def get_leave_settings_payload() -> dict:
     return dict(record.data or {}) if record else {}
 
 
-def get_leave_type_limit(leave_type: str, fallback: Decimal) -> Decimal:
+def get_leave_type_limit(leave_type: str, fallback: Decimal, employee: Employee | None = None) -> Decimal:
     leave_type_key = str(leave_type or "").strip().lower()
+    
+    # 1. Try finding a designation-specific leave type definition first
+    if employee and employee.designation_id:
+        for resource in Resource.objects.filter(resource_type="leave-types"):
+            payload = resource.data or {}
+            name = str(payload.get("name") or "").lower()
+            res_designation_id = payload.get("designation_id")
+            if (
+                leave_type_key
+                and leave_type_key in name
+                and res_designation_id
+                and str(res_designation_id).strip() != ""
+                and str(res_designation_id).lower() != "all"
+            ):
+                try:
+                    if int(res_designation_id) == int(employee.designation_id):
+                        return as_decimal(payload.get("days")) or fallback
+                except (ValueError, TypeError):
+                    pass
+
+    # 2. Otherwise fall back to a global policy (where designation is empty or "all")
     for resource in Resource.objects.filter(resource_type="leave-types"):
         payload = resource.data or {}
         name = str(payload.get("name") or "").lower()
+        res_designation_id = payload.get("designation_id")
         if leave_type_key and leave_type_key in name:
-            return as_decimal(payload.get("days")) or fallback
+            if not res_designation_id or str(res_designation_id).strip() == "" or str(res_designation_id).lower() == "all":
+                return as_decimal(payload.get("days")) or fallback
+            
     return fallback
+
 
 
 def get_holiday_dates() -> set[date]:
@@ -338,7 +363,7 @@ def run_accrual_catchup(balance: LeaveBalance):
 def ensure_leave_balance(employee: Employee, leave_type: str, year: int) -> LeaveBalance:
     settings = get_leave_settings_payload()
     default_allocation = as_decimal(settings.get("max_leave_days") or 24)
-    annual_allocation = get_leave_type_limit(leave_type, default_allocation)
+    annual_allocation = get_leave_type_limit(leave_type, default_allocation, employee=employee)
     carry_forward_cap = as_decimal(settings.get("carry_forward_days") or 0)
 
     balance, created = LeaveBalance.objects.get_or_create(

@@ -34,7 +34,7 @@ const DepartmentsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await API.get("/departments/");
-      setDepartments(Array.isArray(response.data) ? response.data : []);
+      setDepartments(Array.isArray(response.data) ? response.data : response.data?.results || []);
     } catch (error) {
       console.error("Failed to load departments", error);
       setDepartments([]);

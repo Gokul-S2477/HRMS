@@ -193,6 +193,10 @@ class HROrEmployeeScopedViewSet(viewsets.ModelViewSet):
             if not employee_id:
                 return qs.none()
             return qs.filter(**{self.employee_field: employee_id})
+        # HR/Admin: allow filtering by employee query param
+        emp_filter = self.request.query_params.get("employee")
+        if emp_filter:
+            qs = qs.filter(employee_id=emp_filter)
         return qs
 
     def initial(self, request, *args, **kwargs):

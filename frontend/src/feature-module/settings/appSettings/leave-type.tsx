@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { all_routes } from "../../router/all_routes";
-import CollapseHeader from "../../../core/common/collapse-header/collapse-header";
 import API from "../../../api/axios";
+import CollapseHeader from "../../../core/common/collapse-header/collapse-header";
+import { HrmHero } from "../../hrm/hrmShared";
 
 type LeaveTypeRecord = {
   id: string;
@@ -10,20 +9,33 @@ type LeaveTypeRecord = {
     name?: string;
     days?: number;
     status?: string;
+    designation_id?: string;
+    designation_name?: string;
   };
+};
+
+type LeaveRow = {
+  name: string;
+  days: number;
+  status: string;
 };
 
 const RESOURCE = "/data/leave-types/";
 const STATUS_OPTIONS = ["Active", "Inactive"];
 
+const emptyRow = (): LeaveRow => ({ name: "", days: 0, status: "Active" });
+
 const LeaveType = () => {
-  const routes = all_routes;
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeRecord[]>([]);
+  const [designations, setDesignations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [editing, setEditing] = useState<LeaveTypeRecord | null>(null);
-  const [form, setForm] = useState({ name: "", days: 0, status: "Active" });
+  const [saving, setSaving] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+  // For add/edit policy - one designation, multiple rows
+  const [selectedDesignationId, setSelectedDesignationId] = useState("");
+  const [selectedDesignationName, setSelectedDesignationName] = useState("All Designations");
+  const [leaveRows, setLeaveRows] = useState<LeaveRow[]>([emptyRow()]);
 
   const normalize = (data: any): LeaveTypeRecord[] => {
     if (Array.isArray(data)) return data;
@@ -34,60 +46,75 @@ const LeaveType = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await API.get(RESOURCE);
-      setLeaveTypes(normalize(res.data));
+      const [leaveRes, desigRes] = await Promise.all([
+        API.get(RESOURCE),
+        API.get("/designations/"),
+      ]);
+      setLeaveTypes(normalize(leaveRes.data));
+      setDesignations(Array.isArray(desigRes.data) ? desigRes.data : desigRes.data?.results || []);
     } catch (err) {
       console.error("Failed to load leave types", err);
-      setLeaveTypes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const resetForm = () => {
-    setForm({ name: "", days: 0, status: "Active" });
+  const openModal = () => {
+    setSelectedDesignationId("");
+    setSelectedDesignationName("All Designations");
+    setLeaveRows([emptyRow()]);
+    setShowModal(true);
   };
 
-  const handleAdd = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!form.name.trim()) return alert("Leave type is required");
-    try {
-      await API.post(RESOURCE, { data: { ...form, name: form.name.trim() } });
-      setShowAdd(false);
-      resetForm();
-      load();
-    } catch (err) {
-      console.error("Add leave type failed", err);
-      alert("Failed to add leave type");
+  const handleDesignationChange = (idStr: string) => {
+    if (!idStr || idStr === "all") {
+      setSelectedDesignationId("");
+      setSelectedDesignationName("All Designations");
+    } else {
+      const d = designations.find((x) => String(x.id) === idStr);
+      setSelectedDesignationId(idStr);
+      setSelectedDesignationName(d ? d.title : "");
     }
   };
 
-  const openEdit = (item: LeaveTypeRecord) => {
-    setEditing(item);
-    setForm({
-      name: item.data?.name || "",
-      days: item.data?.days || 0,
-      status: item.data?.status || "Active",
-    });
-    setShowEdit(true);
-  };
+  const addRow = () => setLeaveRows((prev) => [...prev, emptyRow()]);
 
-  const handleEdit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!editing) return;
+  const removeRow = (idx: number) =>
+    setLeaveRows((prev) => prev.filter((_, i) => i !== idx));
+
+  const updateRow = (idx: number, field: keyof LeaveRow, value: string | number) =>
+    setLeaveRows((prev) => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+
+  const handleSave = async () => {
+    const validRows = leaveRows.filter((r) => r.name.trim());
+    if (!validRows.length) {
+      alert("Please add at least one leave type with a name.");
+      return;
+    }
+    setSaving(true);
     try {
-      await API.put(`${RESOURCE}${editing.id}/`, { data: { ...form, name: form.name.trim() } });
-      setShowEdit(false);
-      setEditing(null);
-      resetForm();
+      await Promise.all(
+        validRows.map((row) =>
+          API.post(RESOURCE, {
+            data: {
+              name: row.name.trim(),
+              days: row.days,
+              status: row.status,
+              designation_id: selectedDesignationId,
+              designation_name: selectedDesignationName,
+            },
+          })
+        )
+      );
+      setShowModal(false);
       load();
     } catch (err) {
-      console.error("Edit leave type failed", err);
-      alert("Failed to update leave type");
+      console.error("Save leave types failed", err);
+      alert("Failed to save leave types.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -97,324 +124,279 @@ const LeaveType = () => {
       await API.delete(`${RESOURCE}${id}/`);
       load();
     } catch (err) {
-      console.error("Delete leave type failed", err);
-      alert("Failed to delete leave type");
+      alert("Failed to delete.");
     }
   };
 
+  // Group leave types by designation
+  const grouped = leaveTypes.reduce((acc, t) => {
+    const key = t.data?.designation_name || "All Designations";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {} as Record<string, LeaveTypeRecord[]>);
+
+  const heroStats = [
+    { label: "Total Types", value: leaveTypes.length, meta: "Leave types configured" },
+    { label: "Designations", value: Object.keys(grouped).length, meta: "Groups with leave policies" },
+    { label: "Active", value: leaveTypes.filter((t) => t.data?.status === "Active").length, meta: "Currently active leave rules" },
+    { label: "Scope", value: "Auto-Applied", meta: "On employee onboarding" },
+  ];
+
   return (
-    <div>
-      <div className="page-wrapper">
-        <div className="content">
-          <div className="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
-            <div className="my-auto mb-2">
-              <h2 className="mb-1">Settings</h2>
-              <nav>
-                <ol className="breadcrumb mb-0">
-                  <li className="breadcrumb-item">
-                    <Link to={routes.adminDashboard}>
-                      <i className="ti ti-smart-home" />
-                    </Link>
-                  </li>
-                  <li className="breadcrumb-item">Administration</li>
-                  <li className="breadcrumb-item active" aria-current="page">
-                    Settings
-                  </li>
-                </ol>
-              </nav>
+    <div className="page-wrapper">
+      <div className="content container-fluid payroll-shell employee-shell">
+        <HrmHero
+          kicker="Leave Management"
+          title="Leave Types"
+          subtitle="Configure leave types per designation — e.g. HR gets 6 Casual Leave + 6 Sick Leave, Software Engineers get 12 Casual + 12 Sick + 15 Earned Leave. These are auto-applied during onboarding."
+          action={
+            <>
+              <button className="btn btn-primary" onClick={openModal}>
+                <i className="ti ti-circle-plus me-2" />
+                Add Leave Policy
+              </button>
+              <div className="head-icons">
+                <CollapseHeader />
+              </div>
+            </>
+          }
+          stats={heroStats}
+        />
+
+        <div className="row g-4">
+          {loading ? (
+            <div className="col-12 text-center py-5">
+              <div className="spinner-border text-primary" role="status" />
+              <p className="mt-2 text-muted">Loading leave policies...</p>
             </div>
-            <div className="head-icons ms-2">
-              <CollapseHeader />
-            </div>
-          </div>
-          <ul className="nav nav-tabs nav-tabs-solid bg-transparent border-bottom mb-3">
-            <li className="nav-item">
-              <Link className="nav-link" to={routes.profilesettings}>
-                <i className="ti ti-settings me-2" />
-                General Settings
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to={routes.bussinessSettings}>
-                <i className="ti ti-world-cog me-2" />
-                Website Settings
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link active" to={routes.salarySettings}>
-                <i className="ti ti-device-ipad-horizontal-cog me-2" />
-                App Settings
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to={routes.emailSettings}>
-                <i className="ti ti-server-cog me-2" />
-                System Settings
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to={routes.paymentGateways}>
-                <i className="ti ti-settings-dollar me-2" />
-                Financial Settings
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to={routes.customCss}>
-                <i className="ti ti-settings-2 me-2" />
-                Other Settings
-              </Link>
-            </li>
-          </ul>
-          <div className="row">
-            <div className="col-xl-3 theiaStickySidebar">
-              <div className="card">
-                <div className="card-body">
-                  <div className="d-flex flex-column list-group settings-list">
-                    <Link
-                      to={routes.salarySettings}
-                      className="d-inline-flex align-items-center rounded  py-2 px-3"
-                    >
-                      Salary Settings
-                    </Link>
-                    <Link
-                      to={routes.approvalSettings}
-                      className="d-inline-flex align-items-center rounded py-2 px-3"
-                    >
-                      Approval Settings
-                    </Link>
-                    <Link
-                      to={routes.approvalSettings}
-                      className="d-inline-flex align-items-center rounded py-2 px-3"
-                    >
-                      Invoice Settings
-                    </Link>
-                    <Link
-                      to={routes.leaveType}
-                      className="d-inline-flex align-items-center rounded active py-2 px-3"
-                    >
-                      <i className="ti ti-arrow-badge-right me-2" />
-                      Leave Type
-                    </Link>
-                    <Link
-                      to={routes.customFields}
-                      className="d-inline-flex align-items-center rounded py-2 px-3"
-                    >
-                      Custom Fields
-                    </Link>
-                  </div>
+          ) : Object.keys(grouped).length === 0 ? (
+            <div className="col-12">
+              <div className="card payroll-section-card">
+                <div className="card-body text-center py-5">
+                  <i className="ti ti-calendar-off fs-1 text-muted" />
+                  <h5 className="mt-3">No Leave Policies Yet</h5>
+                  <p className="text-muted">Click "Add Leave Policy" to configure leave types for your first designation.</p>
+                  <button className="btn btn-primary mt-2" onClick={openModal}>
+                    <i className="ti ti-circle-plus me-2" />
+                    Add Leave Policy
+                  </button>
                 </div>
               </div>
             </div>
-            <div className="col-xl-9">
-              <div className="card">
-                <div className="card-body">
-                  <div className="border-bottom d-flex align-items-center justify-content-between pb-3 mb-3">
-                    <h4>Leave Type</h4>
-                    <button className="btn btn-primary d-flex align-items-center" onClick={() => setShowAdd(true)}>
-                      <i className="ti ti-circle-plus me-2" />
-                      Add Leave Type
-                    </button>
-                  </div>
-                  <div className="card-body p-0">
-                    <div className="card mb-0">
-                      <div className="card-header d-flex align-items-center justify-content-between">
-                        <h6>Leave Type List</h6>
+          ) : (
+            Object.entries(grouped).map(([desigName, types]) => (
+              <div className="col-md-6 col-xl-4" key={desigName}>
+                <div className="card payroll-section-card h-100">
+                  <div className="card-body">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div>
+                        <h6 className="fw-bold mb-0">{desigName}</h6>
+                        <small className="text-muted">{types.length} leave type(s)</small>
                       </div>
-                      <div className="table-responsive">
-                        <table className="table">
-                          <thead className="thead-light">
-                            <tr>
-                              <th>Leave Type</th>
-                              <th>Leave Days</th>
-                              <th>Status</th>
-                              <th />
+                      <span className="badge bg-primary-subtle text-primary rounded-pill">
+                        {types.reduce((s, t) => s + (Number(t.data?.days) || 0), 0)} days/yr total
+                      </span>
+                    </div>
+
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Leave Type</th>
+                            <th className="text-center">Days/Year</th>
+                            <th className="text-center">Status</th>
+                            <th className="text-end">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {types.map((t) => (
+                            <tr key={t.id}>
+                              <td className="fw-semibold">{t.data?.name || "—"}</td>
+                              <td className="text-center">
+                                <span className="badge bg-info-subtle text-info fw-bold">{t.data?.days ?? "—"}</span>
+                              </td>
+                              <td className="text-center">
+                                <span className={`badge ${t.data?.status === "Active" ? "bg-success" : "bg-secondary"}`}>
+                                  {t.data?.status || "—"}
+                                </span>
+                              </td>
+                              <td className="text-end">
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => handleDelete(t.id)}
+                                  title="Delete"
+                                >
+                                  <i className="ti ti-trash" />
+                                </button>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {loading ? (
-                              <tr>
-                                <td colSpan={4} className="text-center py-4">Loading...</td>
-                              </tr>
-                            ) : leaveTypes.length === 0 ? (
-                              <tr>
-                                <td colSpan={4} className="text-center py-4">No leave types found.</td>
-                              </tr>
-                            ) : (
-                              leaveTypes.map((t) => (
-                                <tr key={t.id}>
-                                  <td className="text-dark">{t.data?.name || "-"}</td>
-                                  <td>{t.data?.days ?? "-"}</td>
-                                  <td>
-                                    <span className={`badge ${t.data?.status === "Active" ? "bg-success" : "bg-secondary"}`}>
-                                      <i className="ti ti-point-filled" />
-                                      {t.data?.status || "Inactive"}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <div className="action-icon d-inline-flex">
-                                      <button className="btn btn-sm btn-light me-2" onClick={() => openEdit(t)}>
-                                        <i className="ti ti-edit" />
-                                      </button>
-                                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>
-                                        <i className="ti ti-trash" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-        <div className="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-          <p className="mb-0">2014 - 2025 � SmartHR.</p>
-          <p>
-            Designed &amp; Developed By{" "}
-            <Link to="#" className="text-primary">
-              Dreams
-            </Link>
-          </p>
+            ))
+          )}
         </div>
       </div>
 
-      {showAdd && (
-        <div className="modal show d-block" tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered modal-md">
+      {/* Add Policy Modal */}
+      {showModal && (
+        <div className="modal show d-block" tabIndex={-1} style={{ background: "rgba(0,0,0,0.45)" }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content">
-              <form onSubmit={handleAdd}>
-                <div className="modal-header">
-                  <h4 className="modal-title">Add Leave Type</h4>
-                  <button type="button" className="btn-close custom-btn-close" onClick={() => setShowAdd(false)}>
-                    <i className="ti ti-x" />
-                  </button>
+              <div className="modal-header">
+                <div>
+                  <h4 className="modal-title mb-0">Add Leave Policy</h4>
+                  <small className="text-muted">Select a designation, then add each leave type with days/year</small>
                 </div>
-                <div className="modal-body pb-0">
-                  <div className="row">
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Leave Type</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Number of days</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          value={form.days}
-                          onChange={(e) => setForm({ ...form, days: Number(e.target.value) })}
-                          min={0}
-                        />
-                      </div>
-                    </div>
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Status</label>
-                        <select
-                          className="form-select"
-                          value={form.status}
-                          onChange={(e) => setForm({ ...form, status: e.target.value })}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
+              </div>
+
+              <div className="modal-body">
+                {/* Step 1 — Designation */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    <i className="ti ti-award me-2 text-primary" />
+                    Step 1: Select Designation
+                  </label>
+                  <select
+                    className="form-select"
+                    value={selectedDesignationId}
+                    onChange={(e) => handleDesignationChange(e.target.value)}
+                  >
+                    <option value="all">All Designations (Global Policy)</option>
+                    {designations.map((d) => (
+                      <option key={d.id} value={d.id}>{d.title}</option>
+                    ))}
+                  </select>
+                  <div className="form-text">
+                    Leaves will be allocated to employees with the designation: <strong>{selectedDesignationName}</strong>
                   </div>
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-light me-2" onClick={() => setShowAdd(false)}>
-                    Cancel
+
+                {/* Step 2 — Leave Rows */}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">
+                    <i className="ti ti-calendar-plus me-2 text-primary" />
+                    Step 2: Add Leave Types for <span className="text-primary">{selectedDesignationName}</span>
+                  </label>
+
+                  <div className="table-responsive">
+                    <table className="table table-bordered align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th style={{ minWidth: 200 }}>Leave Type Name</th>
+                          <th style={{ width: 120 }}>Days / Year</th>
+                          <th style={{ width: 130 }}>Status</th>
+                          <th style={{ width: 60 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaveRows.map((row, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="e.g. Casual Leave (CL)"
+                                value={row.name}
+                                onChange={(e) => updateRow(idx, "name", e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm text-center"
+                                min={0}
+                                max={365}
+                                value={row.days}
+                                onChange={(e) => updateRow(idx, "days", Number(e.target.value))}
+                              />
+                            </td>
+                            <td>
+                              <select
+                                className="form-select form-select-sm"
+                                value={row.status}
+                                onChange={(e) => updateRow(idx, "status", e.target.value)}
+                              >
+                                {STATUS_OPTIONS.map((s) => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="text-center">
+                              {leaveRows.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => removeRow(idx)}
+                                  title="Remove row"
+                                >
+                                  <i className="ti ti-x" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Add Row Button */}
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary btn-sm mt-3 d-flex align-items-center gap-2"
+                    onClick={addRow}
+                  >
+                    <i className="ti ti-circle-plus" />
+                    Add Another Leave Type
                   </button>
-                  <button type="submit" className="btn btn-primary">Add Leave</button>
                 </div>
-              </form>
+
+                {/* Summary */}
+                {leaveRows.some((r) => r.name.trim()) && (
+                  <div className="alert alert-info d-flex align-items-center gap-2 mb-0">
+                    <i className="ti ti-info-circle fs-5" />
+                    <span>
+                      <strong>{leaveRows.filter((r) => r.name.trim()).length}</strong> leave type(s) will be saved for{" "}
+                      <strong>{selectedDesignationName}</strong> —{" "}
+                      <strong>{leaveRows.reduce((s, r) => s + (Number(r.days) || 0), 0)}</strong> total days/year
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-light" onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ti ti-device-floppy me-2" />
+                      Save Leave Policy
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
-      {showEdit && editing && (
-        <div className="modal show d-block" tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered modal-md">
-            <div className="modal-content">
-              <form onSubmit={handleEdit}>
-                <div className="modal-header">
-                  <h4 className="modal-title">Edit Leave Type</h4>
-                  <button type="button" className="btn-close custom-btn-close" onClick={() => { setShowEdit(false); setEditing(null); }}>
-                    <i className="ti ti-x" />
-                  </button>
-                </div>
-                <div className="modal-body pb-0">
-                  <div className="row">
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Leave Type</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Number of days</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          value={form.days}
-                          onChange={(e) => setForm({ ...form, days: Number(e.target.value) })}
-                          min={0}
-                        />
-                      </div>
-                    </div>
-                    <div className="col-md-12">
-                      <div className="mb-3">
-                        <label className="form-label">Status</label>
-                        <select
-                          className="form-select"
-                          value={form.status}
-                          onChange={(e) => setForm({ ...form, status: e.target.value })}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-light me-2" onClick={() => { setShowEdit(false); setEditing(null); }}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary">Save Changes</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {(showAdd || showEdit) && <div className="modal-backdrop show" />}
     </div>
   );
 };
